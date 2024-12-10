@@ -1,0 +1,16 @@
+__pycache__/
+
+# logs
+logs/
+*.log
+
+# database
+*.db
+
+# temporary and test files
+test/
+test.*
+
+# PyCharm and vscode
+.idea/
+.vscode/
