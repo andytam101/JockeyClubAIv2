@@ -21,6 +21,7 @@ def train_model(
     y: torch.Tensor,
     train_size: float,
     epochs: int,
+    model_save_path: str,
 ):
     """
     Provides a generic function to train any model.
@@ -29,6 +30,7 @@ def train_model(
     :param y:
     :param train_size:
     :param epochs:
+    :param model_save_path:
     :return:
     """
     train_x, train_y, cv_x, cv_y = split_data(x, y, train_size)
@@ -70,4 +72,5 @@ def train_model(
         if (epoch + 1) % 100 == 0:
             print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
+    torch.save(model.state_dict(), model_save_path)
     return train_hist, cv_hist

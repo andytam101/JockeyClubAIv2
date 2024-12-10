@@ -6,12 +6,12 @@ import torch
 import utils.config as config
 
 
-def train_model(model, x, y, epochs):
+def train_model(model, x, y, epochs, model_save_path):
     # TODO: refactor this function to take in train_size or cv_size
     m = x.shape[0]
     x = torch.tensor(x, dtype=torch.float32, device=config.device)
     y = torch.tensor(y, dtype=torch.float32, device=config.device).unsqueeze(1)
-    train_hist, cv_hist = train.train_model(model, x, y, 0.8, epochs)
+    train_hist, cv_hist = train.train_model(model, x, y, 0.8, epochs, model_save_path)
     # print(train_hist)
     # print(cv_hist)
     train_cost, train_acc = train_hist[-1]
