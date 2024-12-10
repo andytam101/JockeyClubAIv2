@@ -1,6 +1,6 @@
 import torch
 
-from _model import _Model
+from model._model import _Model
 from utils.config import device
 
 
