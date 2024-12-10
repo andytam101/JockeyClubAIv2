@@ -8,7 +8,7 @@ class _Model(nn.Module, ABC):
 
     @abstractmethod
     def predict(self, x):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def forward(self, x):
