@@ -35,3 +35,6 @@ class Top3NN(_Model):
             self.eval()
             output = self.forward(x)
             return output
+
+    def accuracy(self, output, target):
+        return (torch.round(output) == target).float().mean().item()

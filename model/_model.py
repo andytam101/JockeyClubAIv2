@@ -22,3 +22,7 @@ class _Model(nn.Module, ABC):
     @abstractmethod
     def criterion():
         raise NotImplementedError
+
+    @abstractmethod
+    def accuracy(self, output, target):
+        raise NotImplementedError

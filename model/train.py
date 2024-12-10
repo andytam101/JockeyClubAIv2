@@ -1,15 +1,26 @@
 import torch
-from tqdm import tqdm
 
+from _model import _Model
 from utils.config import device
 
 
+def split_data(x, y, train_size):
+    m = x.size(dim=0)
+    cv_idx = int(m * train_size)
+    train_x = x[:cv_idx]
+    train_y = y[:cv_idx]
+    cv_x = x[cv_idx:]
+    cv_y = y[cv_idx:]
+
+    return train_x, train_y, cv_x, cv_y
+
+
 def train_model(
-    model,
+    model: _Model,
     x: torch.Tensor,
     y: torch.Tensor,
     train_size: float,
-    epochs: int
+    epochs: int,
 ):
     """
     Provides a generic function to train any model.
@@ -20,22 +31,18 @@ def train_model(
     :param epochs:
     :return:
     """
-    m = x.size(dim=0)
-
-    cv_idx  = int(m * train_size)
-    train_x = x[:cv_idx]
-    train_y = y[:cv_idx]
-    cv_x    = x[cv_idx:]
-    cv_y    = y[cv_idx:]
+    train_x, train_y, cv_x, cv_y = split_data(x, y, train_size)
 
     model = model.to(device)
     optimizer = model.optimizer()
     criterion = model.criterion()
+    acc_func = model.accuracy
 
     train_hist = []
     cv_hist    = []
 
-    for epoch in tqdm(range(epochs), desc="Training AI"):
+    print(f"Training model: {model} for {epochs} epochs")
+    for epoch in range(epochs):
         # set model to train mode
         model.train()
 
@@ -46,7 +53,7 @@ def train_model(
         loss.backward()
         optimizer.step()
 
-        train_accuracy = (torch.round(predictions) == train_y).float().mean().item()
+        train_accuracy = acc_func(predictions, train_y)
 
         # set model to evaluate mode
         model.eval()
@@ -55,9 +62,12 @@ def train_model(
             cv_predictions = model(cv_x)
             cv_loss = criterion(cv_predictions, cv_y)
 
-            cv_accuracy = (torch.round(cv_predictions) == cv_y).float().mean().item()
+            cv_accuracy = acc_func(cv_predictions, cv_y)
 
         train_hist.append((loss.item(), train_accuracy))
         cv_hist.append((cv_loss.item(), cv_accuracy))
+
+        if (epoch + 1) % 100 == 0:
+            print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
     return train_hist, cv_hist
