@@ -1,8 +1,9 @@
+import torch
+
 from dataloader.simple_loader import SimpleLoader
-import model.train as train
+from model import train
 from model.top_3_LR import Top3LR
 from model.top_3_NN import Top3NN
-import torch
 import utils.config as config
 
 
