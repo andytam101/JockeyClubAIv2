@@ -6,6 +6,18 @@ from model.top_3_LR import Top3LR
 from model.top_3_NN import Top3NN
 import utils.config as config
 
+from argparse import ArgumentParser
+
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("model")
+    parser.add_argument("output_file")
+    parser.add_argument("-e", "--epochs", type=int, default=10000)
+    parser.add_argument("-p", "--model_path")
+
+    return parser.parse_args()
+
 
 def train_model(model, x, y, epochs, model_save_path):
     # TODO: refactor this function to take in train_size or cv_size
@@ -27,6 +39,7 @@ def train_model(model, x, y, epochs, model_save_path):
 
 
 def main():
+    args = parse_args()
     x, y = SimpleLoader(0.2).load()
     model_1 = Top3LR(input_dim=19)
     model_2 = Top3NN(input_dim=19)
