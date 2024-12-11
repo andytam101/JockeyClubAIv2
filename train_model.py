@@ -64,8 +64,7 @@ def train_model(
 
 def main():
     args = parse_args()
-    x, y = SimpleLoader(0.2).load()
-
+    x, y = SimpleLoader(0.2, "data/simple_loader_v1/").load()
     model = load_model(args.model, args.state_dict_path, input_dim=19)
     train_model(model, x, y, args.epochs, args.train_size, args.output_state)
 

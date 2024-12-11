@@ -17,3 +17,6 @@ test.*
 
 # trained models
 *.pth
+
+# loaded data files
+*.npy
