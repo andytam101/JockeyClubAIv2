@@ -14,25 +14,27 @@ class SimpleLoader(Loader):
         super().__init__(save_dir)
         self.cv_percentage = cv_percentage
 
-    def normalise(self, data):
+        self.zscore_indices = [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16, 18]
+
+    def normalise(self, data, training_mean=None, training_std=None):
         m = len(data)
         cv_index = int(m - m * self.cv_percentage)
         training_data = data[:cv_index]
-        training_mean = np.mean(training_data, axis=0)
-        training_std = np.std(training_data, axis=0)
+        if training_mean is None or training_std is None:
+            training_mean = np.mean(training_data, axis=0)
+            training_std = np.std(training_data, axis=0)
 
         training_std[training_std == 0] = 1
-        zscore_indices = [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16, 18]  # All features for now
 
         for i in range(data.shape[1]):
-            if i in zscore_indices:
+            if i in self.zscore_indices:
                 # Z-score normalization
                 data[:, i] = (data[:, i] - training_mean[i]) / training_std[i]
             else:
                 # Leave as-is (if any feature doesn't require normalization, specify its indices here)
                 pass
 
-        return data
+        return data, training_mean, training_std
 
     def load(self):
         # TODO: refactor this function to take in m (if None then set to length of ps)
@@ -46,9 +48,17 @@ class SimpleLoader(Loader):
             res = self.load_one_participation(p)
             result_x[idx, :] = np.copy(res)
 
-        data_x = self.normalise(result_x)
+        data_x, training_mean, training_std = self.normalise(result_x)
         self.save(data_x, result_y)
-        return data_x, result_y
+        return data_x, result_y, training_mean, training_std
+
+    def load_n_participations(self, ps: list[Participation], training_mean, training_std):
+        m = len(ps)
+        result = np.zeros((m, 19), dtype=np.float32)
+        for idx, p in enumerate(ps):
+            result[idx] = self.load_one_participation(p)
+        res = self.normalise(result, training_mean, training_std)
+        return res
 
     def load_one_participation(self, p: Participation):
         static_data = (self.get_participation_data(p)

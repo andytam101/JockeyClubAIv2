@@ -1,5 +1,8 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
+
+import os
 
 from model._model import _Model
 
@@ -15,13 +18,21 @@ class Top3NN(_Model):
         self.fc2 = nn.Linear(32, 16)
         self.output = nn.Linear(16, 1)
 
+        self.model_state_dict_path = None
+        self.optimizer_state_dict_path = None
+        self.train_mean_path = None
+        self.train_std_path = None
+
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         return torch.sigmoid(self.output(x))
 
     def optimizer(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimiser = optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
+        if self.optimizer_state_dict_path is not None:
+            optimiser.load_state_dict(torch.load(self.optimizer_state_dict_path))
+        return optimiser
 
     @staticmethod
     def criterion():
@@ -38,3 +49,13 @@ class Top3NN(_Model):
 
     def accuracy(self, output, target):
         return (torch.round(output) == target).float().mean().item()
+
+    def load(self, model_dir):
+        super().load(model_dir)
+
+        self.model_state_dict_path = os.path.join(model_dir, "model_state.pth")
+        self.optimizer_state_dict_path = os.path.join(model_dir, "optimizer_state.pth")
+        self.train_mean_path = os.path.join(model_dir, "train_mean.npy")
+        self.train_std_path  = os.path.join(model_dir, "train_std.npy")
+
+        self.load_state_dict(torch.load(self.model_state_dict_path))
