@@ -10,8 +10,8 @@ from tqdm import tqdm
 
 
 class SimpleLoader(Loader):
-    def __init__(self, cv_percentage):
-        super().__init__()
+    def __init__(self, cv_percentage, save_dir=None):
+        super().__init__(save_dir)
         self.cv_percentage = cv_percentage
 
     def normalise(self, data):
@@ -46,7 +46,9 @@ class SimpleLoader(Loader):
             res = self.load_one_participation(p)
             result_x[idx, :] = np.copy(res)
 
-        return self.normalise(result_x), result_y
+        data_x = self.normalise(result_x)
+        self.save(data_x, result_y)
+        return data_x, result_y
 
     def load_one_participation(self, p: Participation):
         static_data = (self.get_participation_data(p)
