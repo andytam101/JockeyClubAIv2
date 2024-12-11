@@ -15,5 +15,8 @@ test.*
 .idea/
 .vscode/
 
-# numpy files
+# trained models
+*.pth
+
+# loaded data files
 *.npy

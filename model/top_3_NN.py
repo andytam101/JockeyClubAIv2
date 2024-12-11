@@ -9,9 +9,9 @@ class Top3NN(_Model):
     Top 3 single class classification. Feedforward Neural Network.
     Input vector: TODO: fill in input vector in comments
     """
-    def __init__(self, input_dim=20):
+    def __init__(self, **kwargs):
         super(Top3NN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 32)
+        self.fc1 = nn.Linear(kwargs["input_dim"], 32)
         self.fc2 = nn.Linear(32, 16)
         self.output = nn.Linear(16, 1)
 
@@ -35,3 +35,6 @@ class Top3NN(_Model):
             self.eval()
             output = self.forward(x)
             return output
+
+    def accuracy(self, output, target):
+        return (torch.round(output) == target).float().mean().item()

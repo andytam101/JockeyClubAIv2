@@ -8,7 +8,7 @@ class _Model(nn.Module, ABC):
 
     @abstractmethod
     def predict(self, x):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def forward(self, x):
@@ -21,4 +21,8 @@ class _Model(nn.Module, ABC):
     @staticmethod
     @abstractmethod
     def criterion():
+        raise NotImplementedError
+
+    @abstractmethod
+    def accuracy(self, output, target):
         raise NotImplementedError
