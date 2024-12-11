@@ -26,7 +26,7 @@ def train_model(model, x, y, epochs):
 
 
 def main():
-    x, y = SimpleLoader(0.2).load()
+    x, y = SimpleLoader(0.2, "data/simple_loader_v1/").load()
     model_1 = Top3LR(input_dim=19)
     model_2 = Top3NN(input_dim=19)
     train_model(model_1, x, y, 10000)
