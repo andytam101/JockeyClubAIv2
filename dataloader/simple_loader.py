@@ -8,6 +8,8 @@ from dataloader.utils import *
 
 from tqdm import tqdm
 
+from utils import utils
+
 
 class SimpleLoader(Loader):
     def __init__(self, cv_percentage, save_dir=None):
@@ -38,7 +40,7 @@ class SimpleLoader(Loader):
 
     def load(self):
         # TODO: refactor this function to take in m (if None then set to length of ps)
-        ps = self.remove_unranked_participants(self.session.query(Participation).all())
+        ps = utils.remove_unranked_participants(self.session.query(Participation).all())
         m = len(ps)
         result_x = np.zeros((m, 19), dtype=np.float32)
         result_y = np.array(list(map(get_ranking_from_participation, ps[:m])), dtype=np.float32)
@@ -78,15 +80,12 @@ class SimpleLoader(Loader):
         trainer_ps = relevant_ps.filter(Horse.trainer_id == p.horse.trainer_id).all()
 
         result = np.array(static_data
-                          + self.get_grouped_stats(self.remove_unranked_participants(horse_ps))
-                          + self.get_grouped_stats(self.remove_unranked_participants(jockey_ps))
-                          + self.get_grouped_stats(self.remove_unranked_participants(trainer_ps)), dtype=np.float32)
+                          + self.get_grouped_stats(utils.remove_unranked_participants(horse_ps))
+                          + self.get_grouped_stats(utils.remove_unranked_participants(jockey_ps))
+                          + self.get_grouped_stats(utils.remove_unranked_participants(trainer_ps)), dtype=np.float32)
 
         result = np.nan_to_num(result)
         return result
-
-    def remove_unranked_participants(self, ps):
-        return list(filter(lambda x: x.ranking.replace("DH", "").strip().isnumeric(), ps))
 
     def get_participation_data(self, p: Participation):
         return [
@@ -111,7 +110,7 @@ class SimpleLoader(Loader):
     def get_grouped_stats(self, ps: list[Participation]):
         speeds = list(map(lambda x: x.race.distance / time_to_number_of_seconds(x.finish_time), ps))
         rankings = list(map(lambda x: get_ranking_from_participation(x) / len(
-            self.remove_unranked_participants(x.race.participations)), ps))
+            utils.remove_unranked_participants(x.race.participations)), ps))
         top_3_count = len(list(filter(lambda k: k <= 3, rankings)))
 
         return [

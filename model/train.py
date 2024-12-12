@@ -82,5 +82,8 @@ def train_model(
             print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
     os.makedirs(model_save_dir, exist_ok=True)
-    torch.save(model.state_dict(), model_save_dir)
+    model_state_path = os.path.join(model_save_dir, 'model_state.pth')
+    optimizer_state_path = os.path.join(model_save_dir, 'optimizer_state.pth')
+    torch.save(model.state_dict(), model_state_path)
+    torch.save(optimizer.state_dict(), optimizer_state_path)
     return train_hist, cv_hist

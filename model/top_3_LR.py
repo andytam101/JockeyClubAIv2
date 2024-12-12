@@ -12,8 +12,8 @@ class Top3LR(_Model):
     Top 3 single class classification. Logistic Regression.
     Input vector: TODO: fill in input vector in comments
     """
-    def __init__(self, **kwargs):
-        super(Top3LR, self).__init__()
+    def __init__(self, dataloader, **kwargs):
+        super(Top3LR, self).__init__(dataloader)
         self.linear = nn.Linear(kwargs["input_dim"], 1)
 
         self.model_state_dict_path = None
