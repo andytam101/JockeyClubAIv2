@@ -1,41 +1,25 @@
+import os
+
+import numpy as np
 import torch
 
 from dataloader.simple_loader import SimpleLoader
-from model import train
-from model.top_3_LR import Top3LR
-from model.top_3_NN import Top3NN
+from model import load_model
+import model.train as train
 import utils.config as config
 
 from argparse import ArgumentParser
 
 
-model_dict = {
-    "Top3LR": Top3LR,
-    "Top3NN": Top3NN,
-}
-
-
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("model")
-    parser.add_argument("output_state")
+    parser.add_argument("output_dir")
     parser.add_argument("-e", "--epochs", type=int, default=10000)
-    parser.add_argument("-s", "--state_dict_path")
+    parser.add_argument("-m", "--model_dir")
     parser.add_argument("-t", "--train_size", type=float, default=0.8)
 
     return parser.parse_args()
-
-
-def load_model(model_name, state_dict_path, **kwargs):
-    try:
-        model = model_dict[model_name](**kwargs)
-    except KeyError:
-        print("Invalid model name.")
-        return None
-
-    if state_dict_path:
-        model.load_state_dict(torch.load(state_dict_path))
-    return model
 
 
 def train_model(
@@ -64,9 +48,15 @@ def train_model(
 
 def main():
     args = parse_args()
-    x, y = SimpleLoader(0.2, "data/simple_loader_v1/").load()
-    model = load_model(args.model, args.state_dict_path, input_dim=19)
-    train_model(model, x, y, args.epochs, args.train_size, args.output_state)
+    loader = SimpleLoader(0.2, "data/simple_loader_v1/")
+    x, y, train_mean, train_std = loader.load()
+    model = load_model(args.model, args.model_dir, input_dim=19)
+    train_model(model, x, y, args.epochs, args.train_size, args.output_dir)
+
+    train_mean_path = os.path.join(args.output_dir, "train_mean.npy")
+    train_std_path = os.path.join(args.output_dir, "train_std.npy")
+    np.save(train_mean_path, train_mean)
+    np.save(train_std_path, train_std)
 
 if __name__ == "__main__":
     main()

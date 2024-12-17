@@ -13,3 +13,7 @@ def parse_date(date_str):
 
 def build_race_id(season_id, season):
     return f"{season}:{season_id}"
+
+
+def remove_unranked_participants(ps):
+    return list(filter(lambda x: x.ranking.replace("DH", "").strip().isnumeric(), ps))

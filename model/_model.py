@@ -3,8 +3,10 @@ from abc import ABC, abstractmethod
 
 
 class _Model(nn.Module, ABC):
-    def __init__(self):
+    def __init__(self, dataloader):
         super(_Model, self).__init__()
+        self.from_load = False
+        self.dataloader = dataloader
 
     @abstractmethod
     def predict(self, x):
@@ -26,3 +28,6 @@ class _Model(nn.Module, ABC):
     @abstractmethod
     def accuracy(self, output, target):
         raise NotImplementedError
+
+    def load(self, model_dir):
+        self.from_load = True
