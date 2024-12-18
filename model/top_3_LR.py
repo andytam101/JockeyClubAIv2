@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -5,6 +6,7 @@ import torch.optim as optim
 import os
 
 from model._model import _Model
+from dataloader.simple_loader import SimpleLoader
 
 
 class Top3LR(_Model):
@@ -21,21 +23,22 @@ class Top3LR(_Model):
         self.train_mean_path = None
         self.train_std_path  = None
 
+    def __repr__(self):
+        return "Top 3 Logistic Regression"
+
+    @staticmethod
+    def _dataloader():
+        return SimpleLoader()
+
+    def _optimizer(self):
+        return optim.SGD(self.parameters(), lr=0.01, momentum=0.9)
+
     def forward(self, x):
         return torch.sigmoid(self.linear(x))
-
-    def optimizer(self):
-        optimiser = optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
-        if self.optimizer_state_dict_path is not None:
-            optimiser.load_state_dict(torch.load(self.optimizer_state_dict_path))
-        return optimiser
 
     @staticmethod
     def criterion():
         return nn.BCELoss()
-
-    def __repr__(self):
-        return "Top 3 Logistic Regression"
 
     def predict(self, x):
         with torch.no_grad():
@@ -46,12 +49,24 @@ class Top3LR(_Model):
     def accuracy(self, output, target):
         return (torch.round(output) == target).float().mean().item()
 
-    def load(self, model_dir):
-        super().load(model_dir)
+    @staticmethod
+    def reformat_predictions(predictions):
+        p_sum = torch.sum(predictions, dim=1, keepdim=True)
+        # multiply by 3 as there are 3 horses in Top 3 (i.e. sum of probabilities should be 300%)
+        return (predictions / p_sum) * 3
 
-        self.model_state_dict_path = os.path.join(model_dir, "model_state.pth")
-        self.optimizer_state_dict_path = os.path.join(model_dir, "optimizer_state.pth")
-        self.train_mean_path = os.path.join(model_dir, "train_mean.npy")
-        self.train_std_path  = os.path.join(model_dir, "train_std.npy")
+    def _load_normalization(self, model_dir):
+        mean_path = os.path.join(model_dir, "train_mean.npy")
+        std_path  = os.path.join(model_dir, "train_std.npy")
 
-        self.load_state_dict(torch.load(self.model_state_dict_path))
+        self.normalization = {
+            "train_mean": np.load(mean_path),
+            "train_std": np.load(std_path)
+        }
+
+    def _save_normalization(self, model_dir):
+        mean_path = os.path.join(model_dir, "train_mean.npy")
+        std_path  = os.path.join(model_dir, "train_std.npy")
+
+        np.save(mean_path, self.normalization["train_mean"])
+        np.save(std_path, self.normalization["train_std"])
