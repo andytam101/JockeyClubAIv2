@@ -49,7 +49,6 @@ class _Model(nn.Module, ABC):
         self.normalization = self.dataloader.train_normalize(train_x)     # returns **kwargs
         self.dataloader.normalize(cv_x, **self.normalization)
 
-        # TODO: do actual training
         self.to(device)
 
         optimizer = self.optimizer
