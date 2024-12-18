@@ -17,7 +17,7 @@ class _Model(nn.Module, ABC):
 
     def load(self, model_dir=None):
         """Function must be called, can maybe be integrated into __init__"""
-        self.optimizer = self._optimizer
+        self.optimizer = self._optimizer()
         if model_dir is None:
             return
 
@@ -57,9 +57,9 @@ class _Model(nn.Module, ABC):
         predictions = self(x)
         return self.reformat_predictions(predictions)
 
-    @property
+    @staticmethod
     @abstractmethod
-    def _dataloader(self):
+    def _dataloader():
         """
         Returns basic unloaded type of dataloader required by each model
         """
