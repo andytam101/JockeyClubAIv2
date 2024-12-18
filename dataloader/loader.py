@@ -30,7 +30,7 @@ class Loader(ABC):
         return train_x, train_y, cv_x, cv_y
 
     @abstractmethod
-    def _load_from_dir(self, directory):
+    def _load_from_dir(self, directory) -> (np.ndarray, np.ndarray):
         raise NotImplementedError()
 
     @abstractmethod
@@ -46,7 +46,7 @@ class Loader(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def normalize(self, data, **kwargs):
+    def normalize(self, x, **kwargs):
         raise NotImplementedError()
 
     @staticmethod
