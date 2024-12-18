@@ -13,9 +13,8 @@ import utils.utils as utils
 
 
 class SimpleLoader(Loader):
-    def __init__(self, cv_percentage, save_dir=None):
+    def __init__(self, save_dir=None):
         super().__init__(save_dir)
-        self.cv_percentage = cv_percentage
         self.zscore_indices = [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16, 18]
 
     @staticmethod
