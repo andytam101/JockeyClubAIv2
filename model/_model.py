@@ -51,6 +51,12 @@ class _Model(nn.Module, ABC):
 
         self.save()
 
+    def predict(self, **kwargs):
+        x = self.dataloader.load_predict(**kwargs)
+        x = self.dataloader.normalize(x, **self.normalization)
+        predictions = self(x)
+        return self.reformat_predictions(predictions)
+
     @property
     @abstractmethod
     def _dataloader(self):
@@ -65,10 +71,6 @@ class _Model(nn.Module, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, x):
-        raise NotImplementedError
-
-    @abstractmethod
     def forward(self, x):
         raise NotImplementedError
 
@@ -80,6 +82,10 @@ class _Model(nn.Module, ABC):
     @abstractmethod
     def accuracy(self, output, target):
         raise NotImplementedError
+
+    @staticmethod
+    def reformat_predictions(predictions):
+        return predictions
 
     @abstractmethod
     def _load_normalization(self, model_directory):
