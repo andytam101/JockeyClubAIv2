@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 import os
 
 from dataloader.loader import Loader as DataLoader
+from utils.config import device
+
 
 class _Model(nn.Module, ABC):
     def __init__(self, output_model_dir, data_path=None):
@@ -48,8 +50,46 @@ class _Model(nn.Module, ABC):
         self.dataloader.normalize(cv_x, **self.normalization)
 
         # TODO: do actual training
+        self.to(device)
+
+        optimizer = self.optimizer
+        criterion = self.criterion()
+        acc_func  = self.accuracy
+
+        train_hist = []
+        cv_hist = []
+
+        print(f"Training model: {self} for {epochs} epochs")
+        for epoch in range(epochs):
+            # set model to train mode
+            self.train()
+
+            optimizer.zero_grad()
+            predictions = self(train_x)
+            loss = criterion(predictions, train_y)
+
+            loss.backward()
+            optimizer.step()
+
+            train_accuracy = acc_func(predictions, train_y)
+
+            # set model to evaluate mode
+            self.eval()
+
+            with torch.no_grad():
+                cv_predictions = self(cv_x)
+                cv_loss = criterion(cv_predictions, cv_y)
+
+                cv_accuracy = acc_func(cv_predictions, cv_y)
+
+            train_hist.append((loss.item(), train_accuracy))
+            cv_hist.append((cv_loss.item(), cv_accuracy))
+
+            if (epoch + 1) % 100 == 0:
+                print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
         self.save()
+        return train_hist, cv_hist
 
     def predict(self, **kwargs):
         x = self.dataloader.load_predict(**kwargs)
