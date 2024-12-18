@@ -81,7 +81,10 @@ class SimpleLoader(Loader):
         train_std[train_x == 0] = 1
         self.normalize(train_x, train_mean=train_mean, train_std=train_std)
 
-        return train_mean, train_std
+        return {
+            "train_mean": train_mean,
+            "train_std": train_std
+        }
 
     def normalize(self, x, **kwargs):
         try:
