@@ -191,3 +191,10 @@ class Scraper:
         self.get_all_races_from_date(datetime(2022, 9, 1).date())
         print("Getting all participation")
         self.get_all_participation_from_races()
+
+    def update_horses(self):
+        horses = self.fetch_horse.all()
+        urls = list(map(lambda x: x.url, horses))
+        print(f"Found {len(urls)} horses")
+        for h in tqdm(urls):
+            self.get_horse(h)
