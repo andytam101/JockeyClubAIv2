@@ -38,7 +38,7 @@ class Loader(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def load_predict(self, **kwargs):
+    def load_predict(self, data):
         raise NotImplementedError()
 
     @abstractmethod

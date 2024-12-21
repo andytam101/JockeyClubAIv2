@@ -6,9 +6,13 @@ from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from datetime import datetime
 
+from torch.fx.passes.pass_manager import this_before_that_pass_constraint
+
+from dataloader.utils import convert_race_class
 from . import driver
 import utils.utils as utils
 
+import calendar
 
 def read_horse(url: str) -> dict:
     """
@@ -348,6 +352,61 @@ def read_all_horses_urls(url: str) -> list[str]:
     table = driver.find_elements(By.CLASS_NAME, "bigborder")[1]
     return list(map(lambda x: x.get_attribute("href").lower(), table.find_elements(By.TAG_NAME, "a")))
 
+
+def read_one_upcoming_race(url):
+    assert url.islower()
+    driver.get(url)
+    data = []
+
+    body = driver.find_element(By.TAG_NAME, "body")
+
+    # RACE SPECIFIC THINGS
+    race_info = body.find_element(By.CLASS_NAME, "margin_top10").text.split("\n")
+
+    date_location = race_info[1]
+    _, month_day, year, location, time = date_location.split(", ")
+    month, day = month_day.split()
+    date = datetime(int(year), datetime.strptime(month, "%B").month, int(day)).date()
+
+    track, distance, condition = race_info[2].split(", ")
+    distance = int(distance[:-1])
+
+    prize_class_info = race_info[3].split(", ")
+    total_bet = prize_class_info[0].split(": ")[1][1:].replace(",", "")
+    race_class = convert_race_class(prize_class_info[2])
+
+    p_table = body.find_element(By.CLASS_NAME, "draggable").find_element(By.TAG_NAME, "tbody")
+    p_rows = p_table.find_elements(By.TAG_NAME, "tr")
+    for row in p_rows:
+        this_p = {"date": date, "location": location, "track": track, "distance": distance, "condition": condition,
+                  "total_bet": total_bet, "race_class": race_class}
+
+        cells = row.find_elements(By.TAG_NAME, "td")
+        cells = list(filter(lambda x: x.text != "", cells))
+
+        if cells[3].text == "-":
+            # Scratched from race (quit)
+            continue
+
+        horse = cells[2]
+        gear_weight = int(cells[3].text)
+        jockey = cells[4]
+        lane = int(cells[5].text)
+        trainer = cells[6]
+        rating = int(cells[7].text)
+        horse_weight = int(cells[9].text)
+
+        this_p["gear_weight"] = gear_weight
+        this_p["horse_weight"] = horse_weight
+        this_p["rating"] = rating
+        this_p["lane"] = lane
+        this_p["horse_url"] = horse.find_element(By.TAG_NAME, "a").get_attribute("href").lower()
+        this_p["jockey_url"] = jockey.find_element(By.TAG_NAME, "a").get_attribute("href").lower()
+        this_p["trainer_url"] = trainer.find_element(By.TAG_NAME, "a").get_attribute("href").lower()
+
+        data.append(this_p)
+
+    return data
 
 def none_if_invalid(
         x,
