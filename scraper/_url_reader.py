@@ -36,6 +36,15 @@ def read_horse(url: str) -> dict:
         result = read_active_horse(url)
         result["retired"] = False
 
+    # read chinese name
+    chi_url = url.replace("english", "chinese")
+    driver.get(chi_url)
+    profile = driver.find_element(By.CLASS_NAME, "horseProfile")
+    name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
+    name_chi = name_id[0]
+    result["name_chi"] = name_chi
+
+
     result["url"] = url
     return result
 

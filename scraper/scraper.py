@@ -196,6 +196,13 @@ class Scraper:
         print("Getting all participation")
         self.get_all_participation_from_races()
 
+    def update_horses(self):
+        horses = self.fetch_horse.all()
+        urls = list(map(lambda x: x.url, horses))
+        print(f"Found {len(urls)} horses")
+        for h in tqdm(urls):
+            self.get_horse(h)
+
     def scrape_one_upcoming_race(self, num):
         # ASSUME TODAY IS A RACE DAY
         url = generate_upcoming_race_url(num)

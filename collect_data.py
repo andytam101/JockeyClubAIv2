@@ -52,8 +52,8 @@ def main():
     )
 
     # scraper.scrape_all()
-    scraper.get_participation_by_race("https://racing.hkjc.com/racing/information/english/racing/localresults.aspx?racedate=2022/09/11&raceno=1")
-
+    # scraper.get_participation_by_race("https://racing.hkjc.com/racing/information/english/racing/localresults.aspx?racedate=2022/09/11&raceno=1")
+    scraper.update_horses()
 
 if __name__ == '__main__':
-    fix()
+    main()
