@@ -106,9 +106,9 @@ class SimpleLoader(Loader):
                        .filter(Race.date >= after)
                        )
 
-        horse_ps = relevant_ps.filter(Participation.horse_id == horse_id).all()
-        jockey_ps = relevant_ps.filter(Participation.jockey_id == jockey_id).all()
-        trainer_ps = relevant_ps.filter(Horse.trainer_id == trainer_id).all()
+        horse_ps = utils.remove_unranked_participants(relevant_ps.filter(Participation.horse_id == horse_id).all())
+        jockey_ps = utils.remove_unranked_participants(relevant_ps.filter(Participation.jockey_id == jockey_id).all())
+        trainer_ps = utils.remove_unranked_participants(relevant_ps.filter(Horse.trainer_id == trainer_id).all())
 
         return horse_ps, jockey_ps, trainer_ps
 
@@ -121,27 +121,33 @@ class SimpleLoader(Loader):
             p.race.date, 90, p.horse_id, p.jockey_id, p.horse.trainer_id)
 
         result = np.array(static_data
-                          + SimpleLoader.get_grouped_stats(utils.remove_unranked_participants(horse_ps))
-                          + SimpleLoader.get_grouped_stats(utils.remove_unranked_participants(jockey_ps))
-                          + SimpleLoader.get_grouped_stats(utils.remove_unranked_participants(trainer_ps)),
+                          + SimpleLoader.get_grouped_stats(horse_ps)
+                          + SimpleLoader.get_grouped_stats(jockey_ps)
+                          + SimpleLoader.get_grouped_stats(trainer_ps),
                           dtype=np.float32)
 
         result = np.nan_to_num(result)
         return result
 
-    def load_predict(self, **kwargs):
+    def load_predict(self, data):
+        result = np.zeros((len(data), 19), dtype=np.float32)
+        for idx, d in enumerate(data):
+            result[idx] = np.copy(self.load_one_predict(**d))
+        return result
+
+    def load_one_predict(self, **kwargs):
         """Load one prediction entry"""
         horse_id = kwargs["horse_id"]
-        jockey_name = kwargs["jockey_name"]
+        jockey_id = kwargs["jockey_id"]
         date = kwargs["date"]
-        trainer_name = kwargs["trainer_name"]
+        trainer_id = kwargs["trainer_id"]
         gear_weight = kwargs["gear_weight"]
         horse_weight = kwargs["horse_weight"]
-        win_odds = kwargs["win_odds"]
         lane = kwargs["lane"]
         race_class = kwargs["race_class"]      # convert_race_class should have already been called
         distance = kwargs["distance"]
         total_bet = kwargs["total_bet"]
+        win_odds = kwargs["win_odds"]
 
         entry = np.zeros(19, dtype=np.float32)
         entry[0] = lane
@@ -151,12 +157,6 @@ class SimpleLoader(Loader):
         entry[4] = race_class
         entry[5] = distance
         entry[6] = total_bet
-
-        js = fetch.FetchJockey.filter(Jockey.name == jockey_name).all()
-        ts = fetch.FetchTrainer.filter(Trainer.name == trainer_name).all()
-
-        jockey_id = None if len(js) == 0 else js[0].id
-        trainer_id = None if len(ts) == 0 else ts[0].id
 
         horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(
             date, 90, horse_id, jockey_id, trainer_id)
