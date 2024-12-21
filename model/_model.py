@@ -15,7 +15,7 @@ class _Model(nn.Module, ABC):
         self.normalization = None
         self.input_model_path  = None
         self.output_model_path = output_model_dir
-        self.dataloader: DataLoader = self._data_loader()
+        self.dataloader: DataLoader = self._dataloader()
 
     def load(self, model_dir=None):
         """Function must be called, can maybe be integrated into __init__"""
@@ -25,8 +25,8 @@ class _Model(nn.Module, ABC):
 
         model_state_dict_path = os.path.join(model_dir, "model_state.pth")
         optimizer_state_dict_path = os.path.join(model_dir, "optimizer_state.pth")
-        self.load_state_dict(torch.load(model_state_dict_path))
-        self.optimizer.load_state_dict(torch.load(optimizer_state_dict_path))
+        self.load_state_dict(torch.load(model_state_dict_path, map_location=device))
+        self.optimizer.load_state_dict(torch.load(optimizer_state_dict_path, map_location=device))
         self.input_model_path = model_dir
 
         # children classes will do more (with normalisation stuff)
@@ -90,9 +90,10 @@ class _Model(nn.Module, ABC):
         self.save()
         return train_hist, cv_hist
 
-    def predict(self, **kwargs):
-        x = self.dataloader.load_predict(**kwargs)
-        x = self.dataloader.normalize(x, **self.normalization)
+    def predict(self, data):
+        x = self.dataloader.load_predict(data)
+        self.dataloader.normalize(x, **self.normalization)
+        x = torch.tensor(x, device=device)
         predictions = self(x)
         return self.reformat_predictions(predictions)
 

@@ -8,14 +8,7 @@ model_dict = {
 }
 
 
-def load_model(model_name, dataloader, model_dir=None, **kwargs):
-    # try:
-    model = model_dict[model_name](dataloader, **kwargs)
-    # except KeyError:
-    #     print("Invalid model name.")
-    #     return None
-
-    if model_dir:
-        model.load(model_dir)
-    model.to(config.device)
+def load_model(model_name, output_dir, model_dir, **kwargs):
+    model = model_dict[model_name](output_dir, **kwargs)
+    model.load(model_dir)
     return model

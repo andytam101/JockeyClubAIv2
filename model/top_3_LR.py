@@ -14,9 +14,9 @@ class Top3LR(_Model):
     Top 3 single class classification. Logistic Regression.
     Input vector: TODO: fill in input vector in comments
     """
-    def __init__(self, dataloader, **kwargs):
-        super(Top3LR, self).__init__(dataloader)
-        self.linear = nn.Linear(kwargs["input_dim"], 1)
+    def __init__(self, output_dir, **kwargs):
+        super(Top3LR, self).__init__(output_dir, kwargs.get("data_path"))
+        self.linear = nn.Linear(19, 1)
 
         self.model_state_dict_path = None
         self.optimizer_state_dict_path = None
@@ -40,18 +40,12 @@ class Top3LR(_Model):
     def criterion():
         return nn.BCELoss()
 
-    def predict(self, x):
-        with torch.no_grad():
-            self.eval()
-            output = self.forward(x)
-            return output
-
     def accuracy(self, output, target):
         return (torch.round(output) == target).float().mean().item()
 
     @staticmethod
     def reformat_predictions(predictions):
-        p_sum = torch.sum(predictions, dim=1, keepdim=True)
+        p_sum = torch.sum(predictions, dim=0)
         # multiply by 3 as there are 3 horses in Top 3 (i.e. sum of probabilities should be 300%)
         return (predictions / p_sum) * 3
 
