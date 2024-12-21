@@ -27,7 +27,7 @@ def read_horse(url: str) -> dict:
     driver.get(url)
     profile = driver.find_element(By.CLASS_NAME, "horseProfile")
     last = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")[-1]
-    if last.rstrip(")") == "Retired":
+    if last.rstrip(")") in {"Retired", "Deregistered"}:
         # retired horse
         result = read_retired_horse(url)
         result["retired"] = True
