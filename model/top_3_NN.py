@@ -48,9 +48,7 @@ class Top3NN(_Model):
 
     @staticmethod
     def reformat_predictions(predictions):
-        p_sum = torch.sum(predictions, dim=0)
-        # multiply by 3 as there are 3 horses in Top 3 (i.e. sum of probabilities should be 300%)
-        return (predictions / p_sum) * 3
+        return predictions
 
     def _load_normalization(self, model_dir):
         mean_path = os.path.join(model_dir, "train_mean.npy")
