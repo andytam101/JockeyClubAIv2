@@ -42,7 +42,7 @@ def read_horse(url: str) -> dict:
     profile = driver.find_element(By.CLASS_NAME, "horseProfile")
     name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
     name_chi = name_id[0]
-    result["name_chi"] = name_chi
+    result["name_chi"] = name_chi.strip()
 
 
     result["url"] = url
@@ -368,7 +368,10 @@ def read_one_upcoming_race(url):
     month, day = month_day.split()
     date = datetime(int(year), datetime.strptime(month, "%B").month, int(day)).date()
 
-    track, distance, condition = race_info[2].split(", ")
+    racing_info = race_info[2].split(", ")
+    track = " ".join(racing_info[:-3])
+    distance = racing_info[-2]
+    condition = racing_info[-1]
     distance = int(distance[:-1])
 
     prize_class_info = race_info[3].split(", ")
