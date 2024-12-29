@@ -5,7 +5,7 @@ from ._generate_url import *
 from datetime import datetime, timedelta
 from tqdm import tqdm
 
-from database import init_engine, Horse, Jockey, Trainer
+from database import init_engine, Horse, Jockey, Trainer, Participation
 
 import logging
 
@@ -101,6 +101,7 @@ class Scraper:
                 jockey_id = self.fetch_jockey.filter(name=p["jockey_name"])[0].id
 
             p["jockey_id"] = jockey_id
+            p["rating"] = read_participation_rating_by_horse(p["horse_url"], p["race_id"])
             self.store_participation(p)
 
     def get_jockey(self, url):
@@ -224,3 +225,17 @@ class Scraper:
             ps.update({"horse_id": horse_id, "jockey_id": jockey_id, "trainer_id": trainer_id})
 
         return race_data
+
+    def update_rating_for_participation(self, horse_id, race_id):
+        horse_url = self.fetch_horse.one(id=horse_id).url
+        rating = read_participation_rating_by_horse(horse_url, race_id)
+        self.store_participation({
+            "horse_id": horse_id,
+            "race_id": race_id,
+            "rating": rating
+        })
+
+    def update_rating_for_all_participation(self):
+        all_ps = self.fetch_participation.all()[4365:]
+        for p in tqdm(all_ps, desc="Updating rating: "):
+            self.update_rating_for_participation(p.horse_id, p.race_id)

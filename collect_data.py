@@ -53,7 +53,9 @@ def main():
 
     # scraper.scrape_all()
     # scraper.get_participation_by_race("https://racing.hkjc.com/racing/information/english/racing/localresults.aspx?racedate=2022/09/11&raceno=1")
-    scraper.update_horses()
+    # scraper.update_horses()
+    scraper.update_rating_for_all_participation()
+
 
 if __name__ == '__main__':
     main()

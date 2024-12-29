@@ -61,7 +61,7 @@ def store_horse(horse_data):
 
 def store_race(race_data):
     # should be completely static, so should not have duplicate
-    race_id = utils.build_race_id(race_data['season_id'], race_data['season'])
+    race_id = utils.build_race_id(race_data['season_id'], race_data['date'])
 
     with _get_session() as session:
         # TODO: get rid of bad commit here
@@ -70,7 +70,7 @@ def store_race(race_data):
         new_race = Race(
             id=race_id,
             season_id=race_data['season_id'],
-            season=race_data["season"],
+            season=utils.calc_season(race_data["date"]),
             date=race_data["date"],
             race_class=race_data["race_class"],
             distance=race_data["distance"],
@@ -128,19 +128,28 @@ def store_training(training_data):
 def store_participation(participation_data):
     # should be completely static, so should not have duplicate
     with _get_session() as session:
-        if session.query(Participation).filter(Participation.horse_id == participation_data['horse_id']).filter(
-                Participation.race_id == participation_data["race_id"]).one_or_none():
-            return
-        new_participation = Participation(
-            horse_id=participation_data['horse_id'],
-            race_id=participation_data['race_id'],
-            lane=participation_data['lane'],
-            rating=participation_data['rating'],
-            gear_weight=participation_data['gear_weight'],
-            horse_weight=participation_data['horse_weight'],
-            win_odds=participation_data['win_odds'],
-            ranking=participation_data['ranking'],
-            jockey_id=participation_data.get('jockey_id'),
-            finish_time=participation_data.get("finish_time"),
-        )
-        session.add(new_participation)
+        p = session.query(Participation).filter(Participation.horse_id == participation_data['horse_id']).filter(
+                Participation.race_id == participation_data["race_id"]).one_or_none()
+        if p is not None:
+            p.lane = participation_data.get('lane', p.lane)
+            p.rating = participation_data.get('rating', p.rating)
+            p.gear_weight = participation_data.get('gear_weight', p.gear_weight)
+            p.horse_weight = participation_data.get('horse_weight', p.horse_weight)
+            p.win_odds = participation_data.get('win_odds', p.win_odds)
+            p.ranking = participation_data.get('ranking', p.ranking)
+            p.jockey_id = participation_data.get('jockey_id', p.jockey_id)
+            p.finish_time = participation_data.get("finish_time", p.finish_time)
+        else:
+            new_participation = Participation(
+                horse_id=participation_data['horse_id'],
+                race_id=participation_data['race_id'],
+                lane=participation_data['lane'],
+                rating=participation_data['rating'],
+                gear_weight=participation_data['gear_weight'],
+                horse_weight=participation_data['horse_weight'],
+                win_odds=participation_data['win_odds'],
+                ranking=participation_data['ranking'],
+                jockey_id=participation_data.get('jockey_id'),
+                finish_time=participation_data.get("finish_time"),
+            )
+            session.add(new_participation)

@@ -209,9 +209,6 @@ def read_race(url: str) -> dict:
     result["date"] = date
     result["location"] = location
 
-    season = utils.calc_season(day=date)
-    result["season"] = season
-
     return result
 
 
@@ -276,7 +273,6 @@ def read_participations_by_race(url: str) -> list[dict]:
     race_meeting = driver.find_element(By.CLASS_NAME, "raceMeeting_select")
     _, date, _ = race_meeting.find_element(By.CLASS_NAME, "f_fs13").text.split("  ")
     date = utils.parse_date(date.strip())
-    season = utils.calc_season(day=date)
 
     all_participation = (driver.find_element(By.CLASS_NAME, "performance").
                          find_element(By.TAG_NAME, "tbody").find_elements(By.TAG_NAME, "tr"))
@@ -287,7 +283,7 @@ def read_participations_by_race(url: str) -> list[dict]:
         this_result = {
             "horse_id": cells[2].text.split(" (")[1].strip().rstrip(")"),
             "horse_url": cells[2].find_element(By.TAG_NAME, "a").get_attribute("href"),
-            "race_id": utils.build_race_id(race_id, season),
+            "race_id": utils.build_race_id(race_id, date),
             "ranking": cells[0].text,
             "rating": None,    # TODO: none for now, find a way to get rating (maybe from horse page)
             "lane": none_if_invalid(cells[7].text, "---", int),
@@ -309,14 +305,34 @@ def read_participations_by_race(url: str) -> list[dict]:
     return result
 
 
-def read_participations_by_horse(url: str) -> list[dict]:
+def read_participation_rating_by_horse(url: str, race_id):
     """
     Takes in a horse profile url. Reads every single participation in that url and return as a list of dictionaries.
     :param url:
+    :param race_id:
     :return:
     """
+    assert url.islower()
+    driver.get(url)
 
-    # CLASS: bigborder (html table)
+    race_table = driver.find_element(By.CLASS_NAME, "bigborder")
+    entries = race_table.find_elements(By.TAG_NAME, "tr")
+    for entry in entries:
+        try:
+            if not entry.text[0].isdigit():
+                continue
+        except IndexError:
+            continue
+
+        cells = entry.find_elements(By.TAG_NAME, "td")
+        season_id = int(cells[0].text)
+        try:
+            date = datetime.strptime(cells[2].text, "%d/%m/%y").date()
+        except ValueError:
+            date = datetime.strptime(cells[2].text, "%d/%m/%Y").date()
+        if utils.build_race_id(season_id, date) != race_id:
+            continue
+        return none_if_invalid(cells[8].text, "--", int)
 
 
 def read_num_races(url: str) -> int:
@@ -410,6 +426,7 @@ def read_one_upcoming_race(url):
         data.append(this_p)
 
     return data
+
 
 def none_if_invalid(
         x,

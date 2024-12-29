@@ -11,8 +11,8 @@ def parse_date(date_str):
     return datetime.strptime(date_str, '%d/%m/%Y').date()
 
 
-def build_race_id(season_id, season):
-    return f"{season}:{season_id}"
+def build_race_id(season_id, date):
+    return f"{calc_season(date)}:{season_id}"
 
 
 def remove_unranked_participants(ps):
