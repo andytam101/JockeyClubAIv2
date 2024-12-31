@@ -15,10 +15,9 @@ from ._trainer import Trainer
 from ._training import Training
 
 
-class Fetch:
+class _FetchDB:
     def __init__(self, model):
         self._model = model
-
     @contextmanager
     def session_scope(self):
         """Provide a transactional scope around a series of operations."""
@@ -54,7 +53,6 @@ class Fetch:
             return False
         return True
 
-
     def filter(self, **kwargs):
         """
         Flexible filter to allow for dynamic queries.
@@ -62,11 +60,16 @@ class Fetch:
         with self.session_scope() as session:
             return session.query(self._model).filter_by(**kwargs).all()
 
+    def __call__(self, **kwargs):
+        # can modify a bit
+        return self.filter(**kwargs)
 
-# Create specific instances of Fetch for each model
-FetchHorse = Fetch(Horse)
-FetchRace = Fetch(Race)
-FetchParticipation = Fetch(Participation)
-FetchJockey = Fetch(Jockey)
-FetchTrainer = Fetch(Trainer)
-FetchTraining = Fetch(Training)
+
+class Fetch:
+    def __init__(self):
+        self.fetch_horse = _FetchDB(Horse)
+        self.fetch_race = _FetchDB(Race)
+        self.fetch_participation = _FetchDB(Participation)
+        self.fetch_jockey = _FetchDB(Jockey)
+        self.fetch_trainer = _FetchDB(Trainer)
+        self.fetch_training = _FetchDB(Training)
