@@ -1,5 +1,5 @@
 """
-Provides an API for fetching data from the database
+Provides an API for fetching loaded_data from the database
 """
 
 from contextlib import contextmanager
@@ -31,9 +31,13 @@ class _FetchDB:
         with self.session_scope() as session:
             return session.query(self._model).all()
 
+    def all_url(self):
+        # does not work with participations and training
+        return list(map(lambda x: x.url, self.all()))
+
     def one(self, **kwargs):
         """
-        Gets the lone data entry using the id primary key. Cannot be used on the participation table.
+        Gets the lone loaded_data entry using the id primary key. Cannot be used on the participation table.
         :return:
         """
         with self.session_scope() as session:
@@ -44,7 +48,6 @@ class _FetchDB:
                 return query.one()
             except NoResultFound as e:
                 raise ValueError(f"No result found") from e
-
 
     def exist(self, **kwargs):
         try:

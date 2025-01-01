@@ -1,5 +1,4 @@
 from datetime import datetime
-from . import _url_reader as reader
 
 
 def generate_race_url(day, number=1):
@@ -16,10 +15,9 @@ def generate_race_url(day, number=1):
     return (race_base + day_str + "&" + num_str).lower()
 
 
-def generate_all_race_urls(day) -> list[str]:
+def generate_all_race_urls(day, total_races) -> list[str]:
     # get number of races
     original_url = generate_race_url(day)
-    total_races = reader.read_num_races(original_url)
 
     result = [original_url]
     for i in range(2, total_races + 1):
@@ -35,7 +33,7 @@ def generate_all_horse_url(location):
     return all_horse_base_url.lower()
 
 
-def convert_trainer_jockey_win_stat_to_profile(url: str):
+def convert_trainer_win_stat_to_profile(url: str):
     url = url.replace("TrainerWinStat", "TrainerProfile").lower()
     return url.split("&season=")[0]
 

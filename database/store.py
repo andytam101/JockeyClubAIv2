@@ -1,5 +1,5 @@
 """
-Provides an API for storing data into the database. Should only be used for the control.
+Provides an API for storing loaded_data into the database. Should only be used for the control.
 """
 
 from contextlib import contextmanager

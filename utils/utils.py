@@ -12,7 +12,7 @@ def parse_date(date_str):
 
 
 def build_race_id(season_id, date):
-    return f"{calc_season(date)}:{season_id}"
+    return f"{calc_season(date)}:{int(season_id)}"
 
 
 def remove_unranked_participants(ps):
