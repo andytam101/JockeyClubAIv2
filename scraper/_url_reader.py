@@ -1,12 +1,10 @@
 """
-Deals with scraping data from raw urls.
+Deals with scraping loaded_data from raw urls.
 External calls to API should not deal with URLS directly.
 """
 from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from datetime import datetime
-
-from torch.fx.passes.pass_manager import this_before_that_pass_constraint
 
 from dataloader.utils import convert_race_class
 from . import driver
@@ -14,152 +12,7 @@ import utils.utils as utils
 
 import calendar
 
-def read_horse(url: str) -> dict:
-    """
-    Read horse from profile in url. First determines whether it is active or retired, then call corrseponding function
-    :param url:
-    :return:
-    """
 
-    # TODO: repeated operation can be reduced to improve efficiency, though not as important for now
-    # TODO: lots of repeated code between read_active_horse and read_retired_horse
-    assert url.islower()
-    driver.get(url)
-    profile = driver.find_element(By.CLASS_NAME, "horseProfile")
-    last = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")[-1]
-    if last.rstrip(")") in {"Retired", "Deregistered"}:
-        # retired horse
-        result = read_retired_horse(url)
-        result["retired"] = True
-    else:
-        # active horse
-        result = read_active_horse(url)
-        result["retired"] = False
-
-    # read chinese name
-    chi_url = url.replace("english", "chinese")
-    driver.get(chi_url)
-    profile = driver.find_element(By.CLASS_NAME, "horseProfile")
-    name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
-    name_chi = name_id[0]
-    result["name_chi"] = name_chi.strip()
-
-
-    result["url"] = url
-    return result
-
-
-def read_active_horse(url: str) -> dict:
-    """
-    Read profile of horse only.
-    :param url:
-    :return:
-    """
-    assert url.islower()
-
-    driver.get(url)
-    result = {}
-    profile = driver.find_element(By.CLASS_NAME, "horseProfile")
-
-    eng_name, horse_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
-    eng_name = eng_name.strip()
-    horse_id = horse_id.strip().rstrip(")")  # remove closing bracket
-
-    tables = profile.find_elements(By.TAG_NAME, "table")
-    left_table = tables[3]
-    right_table = tables[4]
-
-    result["name_eng"] = eng_name
-    result["id"] = horse_id
-
-    # TODO: refactor this to reduce repeated code
-    for row in left_table.text.splitlines():
-        try:
-            category, data = row.split(" : ")
-        except ValueError:
-            # TODO: log this error (may be useful)
-            continue
-
-        match category:
-            case "Country of Origin / Age":
-                origin, age = data.split(" / ")
-                result["origin"] = origin
-                result["age"] = age
-            case "Colour / Sex":
-                colour_sex = data.split(" / ")
-                sex = colour_sex[-1]
-                colour = colour_sex[:-1]
-                result["colour"] = " / ".join(colour)
-                result["sex"] = sex
-            case _:
-                continue
-
-    # TODO: turn this into for loop (like above) if additional fields are required
-    trainer = right_table.find_element(By.TAG_NAME, "tr").find_elements(By.TAG_NAME, "td")[2]
-    trainer_name = trainer.text
-    result["trainer_name"] = trainer_name
-    # give url of trainer in case trainer does not exist in database
-    try:
-        result["trainer_url"] = trainer.find_element(By.TAG_NAME, "a").get_attribute("href")
-    except (NoSuchElementException, ValueError):
-        pass
-
-    return result
-
-
-def read_retired_horse(url: str) -> dict:
-    """
-    Read profile of retired horse only.
-    :param url:
-    :return:
-    """
-    assert url.islower()
-
-    result = {}
-    driver.get(url)
-    profile = driver.find_element(By.CLASS_NAME, "horseProfile")
-
-    eng_name, horse_id, _ = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
-    eng_name = eng_name.strip()
-    horse_id = horse_id.strip().rstrip(")")  # remove closing bracket
-
-    result["id"] = horse_id
-    result["name_eng"] = eng_name
-
-    tables = profile.find_elements(By.TAG_NAME, "table")
-    left_table = tables[2]
-
-    for row in left_table.text.splitlines():
-        try:
-            category, data = row.split(" : ")
-        except ValueError:
-            # TODO: log this error (may be useful)
-            continue
-
-        match category:
-            case "Country of Origin":
-                origin = data
-                result["origin"] = origin
-            case "Colour / Sex":
-                colour_sex = data.split(" / ")
-                sex = colour_sex[-1]
-                colour = colour_sex[:-1]
-                result["colour"] = " / ".join(colour)
-                result["sex"] = sex
-            case _:
-                continue
-
-    races = driver.find_element(By.CLASS_NAME, "bigborder")
-    trainer = races.find_elements(By.TAG_NAME, "tr")[2].find_elements(By.TAG_NAME, "td")[9]
-    try:
-        result["trainer_url"]  = trainer.find_element(By.TAG_NAME, "a").get_attribute("href")
-    except (ValueError, NoSuchElementException):
-        result["trainer_name"] = trainer.text
-
-    # TODO: find way to get age
-    result["age"] = None
-
-    return result
 
 
 def read_race(url: str) -> dict:
@@ -335,40 +188,6 @@ def read_participation_rating_by_horse(url: str, race_id):
         return none_if_invalid(cells[8].text, "--", int)
 
 
-def read_num_races(url: str) -> int:
-    """
-    Takes in a race url. Returns number of races on that day.
-    :param url:
-    :return:
-    """
-    assert url.islower()
-    driver.get(url)
-    top_races = driver.find_element(By.CLASS_NAME, "top_races")
-    return len(top_races.find_element(By.TAG_NAME, "tbody").find_element(By.TAG_NAME, "tr").
-        find_elements(By.TAG_NAME, "td")) - 2
-
-
-def read_is_race(url: str) -> bool:
-    assert url.islower()
-    driver.get(url)
-    try:
-        driver.find_element(By.CLASS_NAME, "top_races")
-    except NoSuchElementException:
-        return False
-    return True
-
-
-def read_all_horses_urls(url: str) -> list[str]:
-    """
-    Takes in url for base horse
-    :param url:
-    :return:
-    """
-    driver.get(url)
-    table = driver.find_elements(By.CLASS_NAME, "bigborder")[1]
-    return list(map(lambda x: x.get_attribute("href").lower(), table.find_elements(By.TAG_NAME, "a")))
-
-
 def read_one_upcoming_race(url):
     assert url.islower()
     driver.get(url)
@@ -427,13 +246,3 @@ def read_one_upcoming_race(url):
 
     return data
 
-
-def none_if_invalid(
-        x,
-        invalid_val,
-        type_cast=lambda x: x   # default type_cast function is the identity function
-):
-    if x == invalid_val:
-        return None
-    else:
-        return type_cast(x)
