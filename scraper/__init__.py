@@ -354,18 +354,22 @@ class Scraper:
         driver = self.driver
         driver.get(url)
 
-        try:
-            result = {
-                "url": url
-            }
+        result = {
+            "url": url
+        }
 
-            lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
-            name = lines[0].strip()
-            age = int(lines[1].split(": ")[1].strip())
-        except Exception as e:
-            e_str = str(e).split("\n")[0]
-            self.logger.error(f"Failed to read trainer/jockey url: {url}. Error: {e_str}")
-            return None
+        lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
+        name = lines[0].strip()
+        age_line = lines[1].split(": ")[1].strip()
+        try:
+            age = int(age_line)
+        except ValueError:
+            if "-" in age_line:
+                age = int(age_line.split(", ")[0].split(" - ")[1].strip())
+            elif "–" in age_line:
+                age = int(age_line.split(", ")[0].split(" – ")[1].strip())
+            else:
+                raise Exception
 
         result["name"] = name
         result["age"] = age
