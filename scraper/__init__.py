@@ -352,16 +352,20 @@ class Scraper:
     def scrape_trainer_jockey(self, url):
         assert url.islower()
         driver = self.driver
-
         driver.get(url)
 
-        result = {
-            "url": url
-        }
+        try:
+            result = {
+                "url": url
+            }
 
-        lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
-        name = lines[0].strip()
-        age = int(lines[1].split(": ")[1].strip())
+            lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
+            name = lines[0].strip()
+            age = int(lines[1].split(": ")[1].strip())
+        except Exception as e:
+            e_str = str(e).split("\n")[0]
+            self.logger.error(f"Failed to read trainer/jockey url: {url}. Error: {e_str}")
+            return None
 
         result["name"] = name
         result["age"] = age

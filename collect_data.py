@@ -87,10 +87,14 @@ class DataCollector:
 
     def get_jockey(self, url):
         jockey = self.scraper.scrape_trainer_jockey(url)
+        if jockey is None:
+            return
         self.store.store_jockey(jockey)
 
     def get_trainer(self, url):
         trainer = self.scraper.scrape_trainer_jockey(url)
+        if trainer is None:
+            return
         self.store.store_trainer(trainer)
 
     def collect_all_horses_at_location(self, location):
