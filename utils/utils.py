@@ -16,4 +16,4 @@ def build_race_id(season_id, date):
 
 
 def remove_unranked_participants(ps):
-    return list(filter(lambda x: x.ranking.replace("DH", "").strip().isnumeric(), ps))
+    return list(filter(lambda x: x.ranking.replace("DH", "").strip().isnumeric() and x.horse is not None, ps))

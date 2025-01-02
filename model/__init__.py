@@ -8,7 +8,6 @@ model_dict = {
 }
 
 
-def load_model(model_name, output_dir, model_dir, **kwargs):
-    model = model_dict[model_name](output_dir, **kwargs)
-    model.load(model_dir)
-    return model
+def load_model(model_name):
+    model = model_dict[model_name]
+    return model()

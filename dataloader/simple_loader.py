@@ -3,7 +3,8 @@ from datetime import timedelta
 
 import numpy as np
 
-from database import Participation, Horse, fetch, Jockey, Trainer
+from database import Participation, Horse, Jockey, Trainer
+from database.fetch import Fetch
 from dataloader.loader import Loader
 from dataloader.utils import *
 
@@ -13,8 +14,9 @@ import utils.utils as utils
 
 
 class SimpleLoader(Loader):
-    def __init__(self, save_dir=None):
-        super().__init__(save_dir)
+    def __init__(self):
+        super().__init__()
+        self.input_features = 20
         self.zscore_indices = [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16, 18]
 
     @staticmethod
@@ -22,6 +24,7 @@ class SimpleLoader(Loader):
         return [
             p.lane,
             p.gear_weight,
+            p.rating if p.rating is not None else 25,
             p.horse_weight,
             p.win_odds
         ]
@@ -54,23 +57,15 @@ class SimpleLoader(Loader):
             np.mean(rankings)
         ]
 
-    def _load_from_dir(self, directory):
-        x_path = os.path.join(directory, "data_x.npy")
-        y_path = os.path.join(directory, "data_y.npy")
-        data_x = np.load(x_path)
-        data_y = np.load(y_path)
-
-        return data_x, data_y
-
-    def _load_from_db(self) -> (np.ndarray, np.ndarray):
-        ps = utils.remove_unranked_participants(self.session.query(Participation).all())
+    def _load_from_db(self, session) -> (np.ndarray, np.ndarray):
+        ps = utils.remove_unranked_participants(session.query(Participation).all())
         m = len(ps)
-        result_x = np.zeros((m, 19), dtype=np.float32)
+        result_x = np.zeros((m, self.input_features), dtype=np.float32)
         result_y = np.array(list(map(get_ranking_from_participation, ps[:m])), dtype=np.float32)
-        result_y = (result_y <= 3).astype(np.float32)
 
-        for idx, p in tqdm(enumerate(ps[:m]), desc="Loading data"):
-            res = self.load_one_participation(p)
+        for idx in tqdm(range(m), desc="Loading data"):
+            p = ps[idx]
+            res = self.load_one_participation(session, p)
             result_x[idx, :] = np.copy(res)
 
         return result_x, result_y
@@ -78,7 +73,7 @@ class SimpleLoader(Loader):
     def train_normalize(self, train_x):
         train_mean = np.mean(train_x, axis=0)
         train_std = np.std(train_x, axis=0)
-        train_std[train_x == 0] = 1
+        train_std[train_std == 0] = 1
         self.normalize(train_x, train_mean=train_mean, train_std=train_std)
 
         return {
@@ -98,26 +93,22 @@ class SimpleLoader(Loader):
             if i in self.zscore_indices:
                 x[:, i] = (x[:, i] - train_mean[i]) / train_std[i]
 
-    def get_relevant_participations(self, before, after_days_count, horse_id, jockey_id, trainer_id):
+    @staticmethod
+    def get_relevant_participations(session, before, after_days_count, horse_id, jockey_id, trainer_id):
         after = before - timedelta(after_days_count)
 
-        relevant_ps = (self.session.query(Participation).join(Race).join(Horse)
-                       .filter(Race.date < before)
-                       .filter(Race.date >= after)
-                       )
-
-        horse_ps = utils.remove_unranked_participants(relevant_ps.filter(Participation.horse_id == horse_id).all())
-        jockey_ps = utils.remove_unranked_participants(relevant_ps.filter(Participation.jockey_id == jockey_id).all())
-        trainer_ps = utils.remove_unranked_participants(relevant_ps.filter(Horse.trainer_id == trainer_id).all())
+        horse_ps = get_relevant_participation(session, before, after, horse_id=horse_id)
+        jockey_ps = get_relevant_participation(session, before, after, jockey_id=jockey_id)
+        trainer_ps = get_relevant_participation(session, before, after, trainer_id=trainer_id)
 
         return horse_ps, jockey_ps, trainer_ps
 
-    def load_one_participation(self, p: Participation):
+    def load_one_participation(self, session, p: Participation):
         static_data = (SimpleLoader.get_participation_data(p)
                        + SimpleLoader.get_race_data(p.race)
                        )
 
-        horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(
+        horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(session,
             p.race.date, 90, p.horse_id, p.jockey_id, p.horse.trainer_id)
 
         result = np.array(static_data
@@ -129,13 +120,13 @@ class SimpleLoader(Loader):
         result = np.nan_to_num(result)
         return result
 
-    def load_predict(self, data):
-        result = np.zeros((len(data), 19), dtype=np.float32)
+    def load_predict(self, fetch, data):
+        result = np.zeros((len(data), self.input_features), dtype=np.float32)
         for idx, d in enumerate(data):
-            result[idx] = np.copy(self.load_one_predict(**d))
+            result[idx] = np.copy(self.load_one_predict(fetch, **d))
         return result
 
-    def load_one_predict(self, **kwargs):
+    def load_one_predict(self, session, **kwargs):
         """Load one prediction entry"""
         horse_id = kwargs["horse_id"]
         jockey_id = kwargs["jockey_id"]
@@ -149,7 +140,7 @@ class SimpleLoader(Loader):
         total_bet = kwargs["total_bet"]
         win_odds = kwargs["win_odds"]
 
-        entry = np.zeros(19, dtype=np.float32)
+        entry = np.zeros(self.input_features, dtype=np.float32)
         entry[0] = lane
         entry[1] = gear_weight
         entry[2] = horse_weight
@@ -158,7 +149,7 @@ class SimpleLoader(Loader):
         entry[5] = distance
         entry[6] = total_bet
 
-        horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(
+        horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(session,
             date, 90, horse_id, jockey_id, trainer_id)
 
         entry[7:11] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(horse_ps), dtype=np.float32))
