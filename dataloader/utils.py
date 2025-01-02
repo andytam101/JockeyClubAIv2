@@ -1,5 +1,24 @@
-from database import init_engine, get_session, Participation, Race
+from database import Horse, Participation, Race
 from datetime import datetime, time
+from utils import utils
+
+
+def get_relevant_participation(session, before, after, horse_id=None, race_id=None, jockey_id=None, trainer_id=None):
+    ps = (session.query(Participation).join(Race).join(Horse)
+    .filter(Race.date < before)
+    .filter(Race.date >= after))
+
+    if horse_id is not None:
+        ps = ps.filter(Horse.id == horse_id)
+    elif race_id is not None:
+        ps = ps.filter(Race.id == race_id)
+    elif jockey_id is not None:
+        ps = ps.filter(Participation.jockey_id == jockey_id)
+    elif trainer_id is not None:
+        ps = ps.filter(Horse.trainer_id == trainer_id)
+
+    result = ps.all()
+    return utils.remove_unranked_participants(result)
 
 
 def get_participation_before(session, horse_id, day):

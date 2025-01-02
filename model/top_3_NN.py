@@ -13,16 +13,11 @@ class Top3NN(_Model):
     Top 3 single class classification. Feedforward Neural Network.
     Input vector: TODO: fill in input vector in comments
     """
-    def __init__(self, output_dir, **kwargs):
-        super(Top3NN, self).__init__(output_dir, kwargs.get("data_path"))
-        self.fc1 = nn.Linear(19, 32)
+    def __init__(self):
+        super(Top3NN, self).__init__()
+        self.fc1 = nn.Linear(self._dataloader().input_features, 32)
         self.fc2 = nn.Linear(32, 16)
         self.output = nn.Linear(16, 1)
-
-        self.model_state_dict_path = None
-        self.optimizer_state_dict_path = None
-        self.train_mean_path = None
-        self.train_std_path = None
 
     def __repr__(self):
         return "Top 3 Feedforward Neural Network"
@@ -31,7 +26,7 @@ class Top3NN(_Model):
     def _dataloader():
         return SimpleLoader()
 
-    def _optimizer(self):
+    def optimizer(self):
         return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
 
     def forward(self, x):
@@ -50,18 +45,12 @@ class Top3NN(_Model):
     def reformat_predictions(predictions):
         return predictions
 
-    def _load_normalization(self, model_dir):
+    def process_y(self, y):
+        return (y <= 3).astype(np.float32).reshape(-1, 1)
+
+    def save_normalization(self, model_dir, **kwargs):
         mean_path = os.path.join(model_dir, "train_mean.npy")
         std_path = os.path.join(model_dir, "train_std.npy")
 
-        self.normalization = {
-            "train_mean": np.load(mean_path),
-            "train_std": np.load(std_path)
-        }
-
-    def _save_normalization(self, model_dir):
-        mean_path = os.path.join(model_dir, "train_mean.npy")
-        std_path = os.path.join(model_dir, "train_std.npy")
-
-        np.save(mean_path, self.normalization["train_mean"])
-        np.save(std_path, self.normalization["train_std"])
+        np.save(mean_path, kwargs["train_mean"])
+        np.save(std_path, kwargs["train_std"])
