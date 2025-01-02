@@ -31,8 +31,8 @@ def main():
     print(f"Stats for {model} after epoch {args.epochs}")
     print(f"Final train cost: {train_cost:.4f}")
     print(f"Final train acc: {train_acc:.4f}")
-    print(f"Final cv_cost: {cv_cost:.4f}")
-    print(f"Final cv_acc: {cv_acc:.4f}")
+    print(f"Final cv cost: {cv_cost:.4f}")
+    print(f"Final cv acc: {cv_acc:.4f}")
 
 
 if __name__ == "__main__":

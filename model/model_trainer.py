@@ -72,6 +72,22 @@ class ModelTrainer:
         criterion = self.model.criterion()
         acc_func = self.model.accuracy
 
+        # show initial loss
+        self.model.eval()
+        with torch.no_grad():
+            predictions = self.model(train_x)
+            loss = criterion(predictions, train_y)
+            accuracy = acc_func(predictions, train_y)
+
+            cv_predictions = self.model(cv_x)
+            cv_loss = criterion(cv_predictions, cv_y)
+            cv_accuracy = acc_func(cv_predictions, cv_y)
+
+            train_hist.append((loss.item(), accuracy))
+            cv_hist.append((cv_loss.item(), cv_accuracy))
+
+            print(f"Initial: train loss = {loss}, cv loss = {cv_loss}")
+
         print(f"Training model: {self.model} for {epochs} epochs")
         for epoch in range(epochs):
             # set model to train mode
