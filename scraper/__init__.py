@@ -8,11 +8,13 @@ import utils.utils as utils
 from datetime import datetime
 import logging
 
+from dataloader.utils import convert_race_class
+
 
 def none_if_invalid(
         x,
         invalid_val,
-        type_cast=lambda x: x   # default type_cast function is the identity function
+        type_cast=lambda x: x  # default type_cast function is the identity function
 ):
     if x == invalid_val:
         return None
@@ -313,7 +315,8 @@ class Scraper:
                     "win_odds": none_if_invalid(cells[11].text, "---", float),
                 }
                 try:
-                    this_result["jockey_url"] = cells[3].find_element(By.TAG_NAME, "a").get_attribute("href")
+                    this_result["jockey_url"] = convert_trainer_win_stat_to_profile(
+                        cells[3].find_element(By.TAG_NAME, "a").get_attribute("href"))
                 except NoSuchElementException:
                     this_result["jockey_name"] = cells[3].text
 
@@ -348,7 +351,6 @@ class Scraper:
                 continue
             return none_if_invalid(cells[8].text, "--", int)
 
-
     def scrape_trainer_jockey(self, url):
         assert url.islower()
         driver = self.driver
@@ -375,3 +377,68 @@ class Scraper:
         result["age"] = age
 
         return result
+
+    def scrape_one_upcoming_race(self, url):
+
+        assert url.islower()
+        driver = self.driver
+
+        driver.get(url)
+        data = []
+
+        body = driver.find_element(By.TAG_NAME, "body")
+
+        # RACE SPECIFIC THINGS
+        race_info = body.find_element(By.CLASS_NAME, "margin_top10").text.split("\n")
+
+        date_location = race_info[1]
+        _, month_day, year, location, time = date_location.split(", ")
+        month, day = month_day.split()
+        date = datetime(int(year), datetime.strptime(month, "%B").month, int(day)).date()
+
+        racing_info = race_info[2].split(", ")
+        track = " ".join(racing_info[:-3])
+        # distance = racing_info[-2]
+        distance = racing_info[-1]
+        # condition = racing_info[-1]
+        distance = int(distance[:-1])
+
+        prize_class_info = race_info[3].split(", ")
+        total_bet = prize_class_info[0].split(": ")[1][1:].replace(",", "")
+        race_class = convert_race_class(prize_class_info[2])
+
+        p_table = body.find_element(By.CLASS_NAME, "draggable").find_element(By.TAG_NAME, "tbody")
+        p_rows = p_table.find_elements(By.TAG_NAME, "tr")
+        for row in p_rows:
+            this_p = {"date": date, "location": location, "track": track, "distance": distance,
+                      # "condition": condition,
+                      "total_bet": total_bet, "race_class": race_class}
+
+            cells = row.find_elements(By.TAG_NAME, "td")
+            cells = list(filter(lambda x: x.text != "", cells))
+
+            if cells[3].text == "-":
+                # Scratched from race (quit)
+                continue
+
+            horse = cells[2]
+            gear_weight = int(cells[3].text)
+            jockey = cells[4]
+            lane = int(cells[5].text)
+            trainer = cells[6]
+            rating = int(cells[7].text)
+            horse_weight = int(cells[9].text)
+
+            this_p["gear_weight"] = gear_weight
+            this_p["horse_weight"] = horse_weight
+            this_p["rating"] = rating
+            this_p["lane"] = lane
+            this_p["horse_url"] = horse.find_element(By.TAG_NAME, "a").get_attribute("href").lower()
+            this_p["jockey_url"] = convert_trainer_win_stat_to_profile(
+                jockey.find_element(By.TAG_NAME, "a").get_attribute("href").lower())
+            this_p["trainer_url"] = convert_trainer_win_stat_to_profile(
+                trainer.find_element(By.TAG_NAME, "a").get_attribute("href").lower())
+
+            data.append(this_p)
+
+        return data

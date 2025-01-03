@@ -1,4 +1,5 @@
 from datetime import datetime
+from wcwidth import wcswidth
 
 
 def calc_season(day=datetime.now()):
@@ -17,3 +18,10 @@ def build_race_id(season_id, date):
 
 def remove_unranked_participants(ps):
     return list(filter(lambda x: x.ranking.replace("DH", "").strip().isnumeric() and x.horse is not None, ps))
+
+
+def pad_chinese(text, width):
+    """Pad Chinese text to ensure it aligns properly."""
+    current_width = wcswidth(text)
+    return text + " " * (width - current_width)
+

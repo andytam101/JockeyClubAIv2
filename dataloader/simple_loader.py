@@ -120,10 +120,10 @@ class SimpleLoader(Loader):
         result = np.nan_to_num(result)
         return result
 
-    def load_predict(self, fetch, data):
+    def load_predict(self, session, data):
         result = np.zeros((len(data), self.input_features), dtype=np.float32)
         for idx, d in enumerate(data):
-            result[idx] = np.copy(self.load_one_predict(fetch, **d))
+            result[idx] = np.copy(self.load_one_predict(session, **d))
         return result
 
     def load_one_predict(self, session, **kwargs):
@@ -131,6 +131,7 @@ class SimpleLoader(Loader):
         horse_id = kwargs["horse_id"]
         jockey_id = kwargs["jockey_id"]
         date = kwargs["date"]
+        rating = kwargs["rating"]
         trainer_id = kwargs["trainer_id"]
         gear_weight = kwargs["gear_weight"]
         horse_weight = kwargs["horse_weight"]
@@ -143,17 +144,18 @@ class SimpleLoader(Loader):
         entry = np.zeros(self.input_features, dtype=np.float32)
         entry[0] = lane
         entry[1] = gear_weight
-        entry[2] = horse_weight
-        entry[3] = win_odds
-        entry[4] = race_class
-        entry[5] = distance
-        entry[6] = total_bet
+        entry[2] = rating
+        entry[3] = horse_weight
+        entry[4] = win_odds
+        entry[5] = race_class
+        entry[6] = distance
+        entry[7] = total_bet
 
         horse_ps, jockey_ps, trainer_ps = self.get_relevant_participations(session,
             date, 90, horse_id, jockey_id, trainer_id)
 
-        entry[7:11] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(horse_ps), dtype=np.float32))
-        entry[11:15] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(jockey_ps), dtype=np.float32))
-        entry[15:19] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(trainer_ps), dtype=np.float32))
+        entry[8:12] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(horse_ps), dtype=np.float32))
+        entry[12:16] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(jockey_ps), dtype=np.float32))
+        entry[16:20] = np.nan_to_num(np.array(SimpleLoader.get_grouped_stats(trainer_ps), dtype=np.float32))
 
         return entry

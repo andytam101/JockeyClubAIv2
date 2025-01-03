@@ -4,9 +4,13 @@ import torch.optim as optim
 
 import numpy as np
 import os
+from tabulate import tabulate
+from wcwidth import wcswidth
 
 from model._model import _Model
 from dataloader.simple_loader import SimpleLoader
+from utils.utils import pad_chinese
+
 
 class Top3NN(_Model):
     """
@@ -15,7 +19,7 @@ class Top3NN(_Model):
     """
     def __init__(self):
         super(Top3NN, self).__init__()
-        self.fc1 = nn.Linear(self._dataloader().input_features, 32)
+        self.fc1 = nn.Linear(self.dataloader.input_features, 32)
         self.fc2 = nn.Linear(32, 16)
         self.output = nn.Linear(16, 1)
 
@@ -54,3 +58,40 @@ class Top3NN(_Model):
 
         np.save(mean_path, kwargs["train_mean"])
         np.save(std_path, kwargs["train_std"])
+
+    def load_normalization(self, model_dir):
+        mean_path = os.path.join(model_dir, "train_mean.npy")
+        std_path = os.path.join(model_dir, "train_std.npy")
+
+        train_mean = np.load(mean_path)
+        train_std = np.load(std_path)
+        return {
+            "train_mean": train_mean,
+            "train_std": train_std
+        }
+
+    def display_results(self, **kwargs):
+        chi_names = kwargs["chi_names"]
+        results = kwargs["results"]
+        win_odds = list(map(lambda x: x[1], kwargs["win_odds"]))
+
+        headers = ["名字", "賠率", "位置機會率", "值博率"]
+        results_list = results.squeeze(1).tolist()
+        multiplied = list(map(lambda x: x[0] * x[1], zip(results_list, win_odds)))
+
+        desired_width = max(wcswidth(chi_str) for chi_str in chi_names + headers)
+
+        results_list = [f"{(pred * 100):.1f}%" for pred in results_list]
+        win_odds = [f"{odd:.2f}" for odd in win_odds]
+        multiplied = [f"{val:.3f}" for val in multiplied]
+        chi_names = [pad_chinese(name, desired_width) for name in chi_names]
+        res = list(map(list, zip(chi_names, win_odds, results_list, multiplied)))
+        res.sort(key=lambda x: x[3], reverse=True)
+
+        print(tabulate(
+            res,
+            headers=headers,
+            tablefmt="psql",
+            colalign=["center"] * len(res[0]),
+            floatfmt=".3f"
+        ))

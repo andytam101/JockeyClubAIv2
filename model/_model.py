@@ -52,5 +52,13 @@ class _Model(nn.Module, ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def load_normalization(self, model_dir):
+        raise NotImplementedError
+
+    @abstractmethod
     def process_y(self, y):
+        raise NotImplementedError
+
+    @abstractmethod
+    def display_results(self, **kwargs):
         raise NotImplementedError
