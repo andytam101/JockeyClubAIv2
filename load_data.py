@@ -18,8 +18,10 @@ def main():
     args = parse_args()
     db_path = "sqlite:///" + args.db_path
     init_engine(db_path)
+    session = get_session()
     dataloader = load_dataloader(args.loader_name)
-    dataloader.load_train(get_session(), args.save_path)
+    dataloader.load_train(session, args.save_path)
+    session.close()
 
 
 if __name__ == "__main__":

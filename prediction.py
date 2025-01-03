@@ -78,7 +78,7 @@ def main():
     data_collector = DataCollector(scraper, fetch, store)
     race_data = scrape_one_upcoming_race(data_collector, args.race_num)
 
-    # # TODO: consider case where horse does not exist in database
+    # TODO: consider case where horse does not exist in database
     horse_id = list(map(lambda x: x["horse_id"], race_data))
     horses = list(map(lambda x: fetch.fetch_horse.one(id=x), horse_id))
     chi_names = list(map(lambda x: x.name_chi.strip(), horses))
@@ -98,6 +98,7 @@ def main():
         results=results,
         win_odds=win_odds,
     )
+    session.close()
 
 
 if __name__ == "__main__":
