@@ -41,6 +41,5 @@ def convert_trainer_win_stat_to_profile(url: str):
 def generate_upcoming_race_url(num):
     # ASSUME TODAY IS A RACE DAY
     upcoming_race_base_url = "https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx"
-    # url = upcoming_race_base_url + f"?RaceDate={datetime.strftime(datetime.today(), '%Y/%m/%d')}" + f"&RaceNo={num}"
-    url = upcoming_race_base_url + "?RaceDate=2025/01/05&" + f"RaceNo={num}"
+    url = upcoming_race_base_url + f"?RaceDate={datetime.strftime(datetime.today(), '%Y/%m/%d')}" + f"&RaceNo={num}"
     return url.lower()

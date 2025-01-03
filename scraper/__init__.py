@@ -225,7 +225,6 @@ class Scraper:
         :return:
         """
 
-        # TODO: ERROR HANDLING
         assert url.islower()
         driver = self.driver
         driver.get(url)
@@ -398,9 +397,8 @@ class Scraper:
 
         racing_info = race_info[2].split(", ")
         track = " ".join(racing_info[:-3])
-        # distance = racing_info[-2]
-        distance = racing_info[-1]
-        # condition = racing_info[-1]
+        distance = racing_info[-2]
+        condition = racing_info[-1]
         distance = int(distance[:-1])
 
         prize_class_info = race_info[3].split(", ")
@@ -411,14 +409,14 @@ class Scraper:
         p_rows = p_table.find_elements(By.TAG_NAME, "tr")
         for row in p_rows:
             this_p = {"date": date, "location": location, "track": track, "distance": distance,
-                      # "condition": condition,
+                      "condition": condition,
                       "total_bet": total_bet, "race_class": race_class}
 
             cells = row.find_elements(By.TAG_NAME, "td")
             cells = list(filter(lambda x: x.text != "", cells))
 
             if cells[3].text == "-":
-                # Scratched from race (quit)
+                # Scratched (quit)
                 continue
 
             horse = cells[2]
