@@ -266,6 +266,47 @@ class Scraper:
 
             result["date"] = date
             result["location"] = location
+
+            # winnings
+            winnings_table = (driver.find_element(By.CLASS_NAME, "localResults")
+                              .find_element(By.CLASS_NAME, "dividend_tab")
+                              .find_element(By.TAG_NAME, "tbody"))
+
+            rows = winnings_table.find_elements(By.TAG_NAME, "tr")
+            current_pool = None
+            winnings = []
+            for row in rows:
+                cells = row.find_elements(By.TAG_NAME, "td")
+                if len(cells) == 2:
+                    winning_combination = cells[0].text
+                    amount = cells[1].text
+                elif len(cells) == 3:
+                    current_pool = cells[0].text.strip()
+                    winning_combination = cells[1].text
+                    amount = cells[2].text
+                else:
+                    raise Exception("The number of cells in this winnings table row is not 2 or 3")
+
+                if current_pool not in {"WIN", "PLACE", "QUINELLA", "QUINELLA PLACE", "FORECAST", "TIERCE", "TRIO",
+                                        "FIRST 4", "QUARTET"}:
+                    continue
+
+                amount = amount.replace(",", "")
+                if "/$" in amount:
+                    payout, unit = amount.split("/$")
+                    unit = float(unit)
+                    payout = float(payout)
+                    amount = payout * (10 / unit)
+                else:
+                    amount = float(amount)
+
+                winnings.append({
+                    "amount": amount,
+                    "pool": current_pool,
+                    "combination": winning_combination,
+                })
+
+            result["winnings"] = winnings
             return result
         except Exception as e:
             error_str = str(e).split("\n")[0]
@@ -302,6 +343,7 @@ class Scraper:
                 cells = p.find_elements(By.TAG_NAME, "td")
                 horse_url = cells[2].find_element(By.TAG_NAME, "a").get_attribute("href")
                 this_result = {
+                    "number": int(cells[1].text),
                     "horse_id": cells[2].text.split(" (")[1].strip().rstrip(")"),
                     "horse_url": horse_url,
                     "race_id": race_id,

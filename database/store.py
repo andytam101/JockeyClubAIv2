@@ -11,6 +11,7 @@ from ._participation import Participation
 from ._jockey import Jockey
 from ._trainer import Trainer
 from ._training import Training
+from ._winnings import Winnings
 
 import utils.utils as utils
 
@@ -38,7 +39,7 @@ class Store:
                 horse.age = horse_data['age']
                 horse.retired = horse_data['retired']
                 horse.age = horse_data['age']
-                # horse.sex = horse_data["sex"]
+                horse.sex = horse_data["sex"]
                 horse.retired = horse_data['retired']
                 horse.origin = horse_data['origin']
                 horse.colour = horse_data['colour']
@@ -58,30 +59,37 @@ class Store:
                 )
                 session.add(new_horse)
 
-
     def store_race(self, race_data):
         # should be completely static, so should not have duplicate
         race_id = utils.build_race_id(race_data['season_id'], race_data['date'])
 
         with self._get_session() as session:
             # TODO: get rid of bad commit here
-            if session.query(Race).filter(Race.id == race_id).one_or_none():
-                return
-            new_race = Race(
-                id=race_id,
-                season_id=race_data['season_id'],
-                season=utils.calc_season(race_data["date"]),
-                date=race_data["date"],
-                race_class=race_data["race_class"],
-                distance=race_data["distance"],
-                location=race_data["location"],
-                course=race_data["course"],
-                condition=race_data["condition"],
-                total_bet=race_data["total_bet"],
-                url=race_data["url"],
-            )
-            session.add(new_race)
-
+            race = session.query(Race).filter(Race.id == race_id).one_or_none()
+            if race:
+                race.date = race_data.get("date", race.date)
+                race.race_class = race_data.get("race_class", race.race_class)
+                race.distance = race_data.get("distance", race.distance)
+                race.location = race_data.get("location", race.location)
+                race.course = race_data.get("course", race.course)
+                race.condition = race_data.get("condition", race.condition)
+                race.total_bet = race_data.get("total_bet", race.total_bet)
+                race.url = race_data.get("url", race.url)
+            else:
+                new_race = Race(
+                    id=race_id,
+                    season_id=race_data['season_id'],
+                    season=utils.calc_season(race_data["date"]),
+                    date=race_data["date"],
+                    race_class=race_data["race_class"],
+                    distance=race_data["distance"],
+                    location=race_data["location"],
+                    course=race_data["course"],
+                    condition=race_data["condition"],
+                    total_bet=race_data["total_bet"],
+                    url=race_data["url"],
+                )
+                session.add(new_race)
 
     def store_jockey(self, jockey_data):
         with self._get_session() as session:
@@ -96,7 +104,6 @@ class Store:
                 )
                 session.add(new_jockey)
 
-
     def store_trainer(self, trainer_data):
         with self._get_session() as session:
             trainer = session.query(Trainer).filter(Trainer.name == trainer_data['name']).one_or_none()
@@ -109,7 +116,6 @@ class Store:
                     url=trainer_data['url'],
                 )
                 session.add(new_trainer)
-
 
     def store_training(self, training_data):
         # should be completely static, so should not have duplicate
@@ -124,12 +130,11 @@ class Store:
             )
             session.add(new_training)
 
-
     def store_participation(self, participation_data):
         # should be completely static, so should not have duplicate
         with self._get_session() as session:
             p = session.query(Participation).filter(Participation.horse_id == participation_data['horse_id']).filter(
-                    Participation.race_id == participation_data["race_id"]).one_or_none()
+                Participation.race_id == participation_data["race_id"]).one_or_none()
             if p is not None:
                 p.lane = participation_data.get('lane', p.lane)
                 p.rating = participation_data.get('rating', p.rating)
@@ -153,3 +158,21 @@ class Store:
                     finish_time=participation_data.get("finish_time"),
                 )
                 session.add(new_participation)
+
+    def store_winnings(self, winnings_data):
+        race_id = winnings_data['race_id']
+        pool = winnings_data['pool']
+        combination = winnings_data['combination']
+        with self._get_session() as session:
+            winnings = session.query(Winnings).filter(Winnings.race_id == race_id).filter(Winnings.pool == pool).filter(
+                Winnings.combination == combination).one_or_none()
+            if winnings:
+                winnings.amount = winnings_data['amount']
+            else:
+                new_winnings = Winnings(
+                    race_id=race_id,
+                    pool=pool,
+                    combination=combination,
+                    amount=winnings_data['amount'],
+                )
+                session.add(new_winnings)

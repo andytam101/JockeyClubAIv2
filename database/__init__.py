@@ -9,10 +9,12 @@ from ._participation import Participation
 from ._jockey import Jockey
 from ._trainer import Trainer
 from ._training import Training
+from ._winnings import Winnings
 
 
 _engine = None
 _Session: sessionmaker = None
+
 
 def init_engine(db_path=config.DATABASE_PATH):
     global _engine, _Session

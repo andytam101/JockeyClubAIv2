@@ -20,3 +20,4 @@ class Race(Base):
     url        = Column(String, unique=True, nullable=False)
 
     participations = relationship("Participation", back_populates="race")
+    winnings = relationship("Winnings", back_populates="race")

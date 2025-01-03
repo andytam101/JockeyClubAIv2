@@ -10,6 +10,8 @@ from tqdm import tqdm
 from datetime import datetime, timedelta
 import logging
 
+from utils import utils
+
 
 class DataCollector:
     def __init__(self, scraper, fetch, store, race_url_save_path=None, race_url_found=False):
@@ -54,6 +56,13 @@ class DataCollector:
         if race is None:
             return
         self.store.store_race(race)
+
+        winnings = race["winnings"]
+        race_id = utils.build_race_id(race["season_id"], race["date"])
+
+        for winning in winnings:
+            winning["race_id"] = race_id
+            self.store.store_winnings(winning)
 
     def get_participations(self, url):
         participations = self.scraper.scrape_participation_by_race(url)
@@ -157,6 +166,11 @@ class DataCollector:
         for url in tqdm(all_horses_url, desc="Updating horses"):
             self.get_horse(url)
 
+    def update_races(self):
+        all_races_url = self.fetch.fetch_race.all_url()
+        for url in tqdm(all_races_url, desc="Updating races"):
+            self.get_race(url)
+
     def update_jockeys(self):
         all_jockeys_url = self.fetch.fetch_jockey.all_url()
         for url in tqdm(all_jockeys_url, desc="Updating jockeys"):
@@ -171,12 +185,13 @@ class DataCollector:
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("instruction")
-    parser.add_argument("db_path", default="database.db")
+    parser.add_argument("-db", "--db_path", default="database.db")
     parser.add_argument("-s", "--start_date", default="2022/09/01")
     parser.add_argument("-e", "--end_date")
     parser.add_argument("-p", "--url_path", default=None)
     parser.add_argument("-f", "--url_found", action="store_true")
     parser.add_argument("-l", "--logging", default="collect_data.log")
+    parser.add_argument("-i", "--item")
     return parser.parse_args()
 
 
@@ -196,10 +211,22 @@ def main():
     if instruction in {"build", "b"}:
         data_collector.collect_all_data(start_date)
     elif instruction in {"update", "u"}:
-        data_collector.collect_yesterday_race()
-        data_collector.update_horses()
-        data_collector.update_jockeys()
-        data_collector.update_trainers()
+        if args.item is None:
+            data_collector.collect_yesterday_race()
+            data_collector.update_horses()
+            data_collector.update_races()
+            data_collector.update_jockeys()
+            data_collector.update_trainers()
+        elif args.item in {"horses", "h", "horse"}:
+            data_collector.update_horses()
+        elif args.item in {"races", "r", "race"}:
+            data_collector.update_races()
+        elif args.item in {"trainers", "t", "trainer"}:
+            data_collector.update_trainers()
+        elif args.item in {"jockeys", "j", "jockey"}:
+            data_collector.update_jockeys()
+        else:
+            print("Invalid item")
 
 
 if __name__ == "__main__":
