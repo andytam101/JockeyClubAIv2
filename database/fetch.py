@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from sqlalchemy.exc import NoResultFound
 
-from . import get_session
+from . import get_session, Winnings
 from ._horse import Horse
 from ._race import Race
 from ._participation import Participation
@@ -76,3 +76,5 @@ class Fetch:
         self.fetch_jockey = _FetchDB(Jockey)
         self.fetch_trainer = _FetchDB(Trainer)
         self.fetch_training = _FetchDB(Training)
+        self.fetch_winnings = _FetchDB(Winnings)
+        
