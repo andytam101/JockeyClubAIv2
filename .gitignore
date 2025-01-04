@@ -20,3 +20,7 @@ test.*
 
 # loaded data files
 *.npy
+
+# miscellaneous data files
+*.txt
+*.csv
