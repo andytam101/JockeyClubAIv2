@@ -3,13 +3,14 @@ import os
 from abc import ABC, abstractmethod
 
 class Loader(ABC):
-    def load_train(self, session, output_dir):
-        x, y = self._load_from_db(session)
+    def load_train(self, session, output_dir, start_date=None, end_date=None):
+        # start_date and end_date decides range of races to include
+        x, y = self._load_from_db(session, start_date, end_date)
         session.close()
         self._save(output_dir, x, y)
 
     @abstractmethod
-    def _load_from_db(self, session):
+    def _load_from_db(self, session, start_date=None, end_date=None):
         raise NotImplementedError()
 
     @abstractmethod

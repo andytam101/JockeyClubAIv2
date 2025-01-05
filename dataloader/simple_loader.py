@@ -57,8 +57,17 @@ class SimpleLoader(Loader):
             np.mean(rankings)
         ]
 
-    def _load_from_db(self, session) -> (np.ndarray, np.ndarray):
-        ps = utils.remove_unranked_participants(session.query(Participation).all())
+    def _load_from_db(self, session, start_date=None, end_date=None) -> (np.ndarray, np.ndarray):
+        ps = session.query(Participation).join(Race)
+
+        if start_date is not None:
+            ps = ps.filter(Race.date >= start_date)
+
+        if end_date is not None:
+            ps = ps.filter(Race.date < end_date)
+
+        ps = ps.all()
+        ps = utils.remove_unranked_participants(ps)
         m = len(ps)
         result_x = np.zeros((m, self.input_features), dtype=np.float32)
         result_y = np.array(list(map(get_ranking_from_participation, ps[:m])), dtype=np.float32)
