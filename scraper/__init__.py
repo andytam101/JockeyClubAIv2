@@ -83,7 +83,6 @@ class Scraper:
                 trainer_url = convert_trainer_win_stat_to_profile(result["trainer_url"])
                 result["trainer_url"] = trainer_url
         except Exception as e:
-            raise e
             e_str = str(e).split("\n")[0]
             self.logger.error(f"Failed to read horse url: {url}. Error: {e_str}")
             return
