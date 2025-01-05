@@ -10,6 +10,7 @@ class Participation(Base):
     horse_id     = Column(String, ForeignKey("horse.id"), primary_key=True, nullable=False)
     race_id      = Column(String, ForeignKey("race.id"), primary_key=True, nullable=False)
     ranking      = Column(String)    # can have special error codes: like DISQ for disqualified
+    number       = Column(Integer, nullable=False)
     lane         = Column(Integer)
     rating       = Column(Integer)
     gear_weight  = Column(Integer)

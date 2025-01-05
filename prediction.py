@@ -4,7 +4,7 @@ from collect_data import DataCollector
 from database import init_engine, get_session
 from database.fetch import Fetch
 from database.store import Store
-from scraper import Scraper, generate_upcoming_race_url
+from scraper import Scraper, generate_upcoming_race_url, extract_jockey_trainer_id_from_url
 
 from model import load_model
 from model.model_prediction import ModelPrediction
@@ -43,14 +43,16 @@ def scrape_one_upcoming_race(data_collector: DataCollector, num):
         jockey_url = ps["jockey_url"]
         trainer_url = ps["trainer_url"]
 
-        # TODO: handle case where horse, jockey or trainer does not exist
+        jockey_id = extract_jockey_trainer_id_from_url(jockey_url)
+        trainer_id = extract_jockey_trainer_id_from_url(trainer_url)
+
         if not fetch.fetch_horse.exist(url=horse_url):
             data_collector.get_horse(horse_url)
 
-        if not fetch.fetch_jockey.exist(url=jockey_url):
+        if not fetch.fetch_jockey.exist(id=jockey_id):
             data_collector.get_jockey(jockey_url)
 
-        if not fetch.fetch_trainer.exist(url=trainer_url):
+        if not fetch.fetch_trainer.exist(id=trainer_id):
             data_collector.get_trainer(trainer_url)
 
         horse_id = fetch.fetch_horse.one(url=horse_url).id

@@ -7,7 +7,7 @@ from ._base import Base
 class Trainer(Base):
     __tablename__ = 'trainer'
 
-    id   = Column(Integer, primary_key=True, autoincrement=True)
+    id   = Column(String, primary_key=True)
     name = Column(String)
     age  = Column(Integer)
     url  = Column(String)

@@ -3,6 +3,7 @@ from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 
 from .generate_url import *
+from .utils import *
 
 import utils.utils as utils
 from datetime import datetime
@@ -10,16 +11,6 @@ import logging
 
 from dataloader.utils import convert_race_class
 
-
-def none_if_invalid(
-        x,
-        invalid_val,
-        type_cast=lambda x: x  # default type_cast function is the identity function
-):
-    if x == invalid_val:
-        return None
-    else:
-        return type_cast(x)
 
 
 class Scraper:
@@ -277,34 +268,41 @@ class Scraper:
             winnings = []
             for row in rows:
                 cells = row.find_elements(By.TAG_NAME, "td")
-                if len(cells) == 2:
-                    winning_combination = cells[0].text
-                    amount = cells[1].text
-                elif len(cells) == 3:
-                    current_pool = cells[0].text.strip()
-                    winning_combination = cells[1].text
-                    amount = cells[2].text
-                else:
-                    raise Exception("The number of cells in this winnings table row is not 2 or 3")
+                try:
+                    if len(cells) == 2:
+                        winning_combination = cells[0].text
+                        amount = cells[1].text
+                    elif len(cells) == 3:
+                        current_pool = cells[0].text.strip()
+                        winning_combination = cells[1].text
+                        amount = cells[2].text
+                    else:
+                        raise Exception("The number of cells in this winnings table row is not 2 or 3")
 
-                if current_pool not in {"WIN", "PLACE", "QUINELLA", "QUINELLA PLACE", "FORECAST", "TIERCE", "TRIO",
-                                        "FIRST 4", "QUARTET"}:
-                    continue
+                    if current_pool not in {"WIN", "PLACE", "QUINELLA", "QUINELLA PLACE", "FORECAST", "TIERCE", "TRIO",
+                                            "FIRST 4", "QUARTET"}:
+                        continue
 
-                amount = amount.replace(",", "")
-                if "/$" in amount:
-                    payout, unit = amount.split("/$")
-                    unit = float(unit)
-                    payout = float(payout)
-                    amount = payout * (10 / unit)
-                else:
-                    amount = float(amount)
+                    amount = amount.replace(",", "")
+                    if amount == "REFUND":
+                        amount = 10
+                    elif "/$" in amount:
+                        payout, unit = amount.split("/$")
+                        unit = float(unit)
+                        payout = float(payout)
+                        amount = payout * (10 / unit)
+                    else:
+                        amount = float(amount)
 
-                winnings.append({
-                    "amount": amount,
-                    "pool": current_pool,
-                    "combination": winning_combination,
-                })
+                    winnings.append({
+                        "amount": amount,
+                        "pool": current_pool,
+                        "combination": winning_combination,
+                    })
+
+                except Exception as e:
+                    error_str = str(e).split("\n")[0]
+                    self.logger.error(f"Failed to read winnings table row at url: {url}. Error: {error_str}")
 
             result["winnings"] = winnings
             return result
@@ -401,7 +399,11 @@ class Scraper:
             "url": url
         }
 
-        lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
+        try:
+            lines = driver.find_element(By.TAG_NAME, "table").text.splitlines()
+        except Exception as e:
+            print(url)
+            raise e
         name = lines[0].strip()
         age_line = lines[1].split(": ")[1].strip()
         try:

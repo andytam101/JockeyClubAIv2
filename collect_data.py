@@ -1,5 +1,6 @@
 from scraper import Scraper
 from scraper.generate_url import *
+from scraper.utils import *
 
 from database import init_engine
 from database.fetch import Fetch
@@ -36,17 +37,18 @@ class DataCollector:
         trainer_name = horse["trainer_name"]
         if trainer_url:
             trainer_url = trainer_url.lower()
-            if not self.fetch.fetch_trainer.exist(url=trainer_url):
+            trainer_id = extract_jockey_trainer_id_from_url(trainer_url)
+            if not self.fetch.fetch_trainer.exist(id=trainer_id):
                 self.get_trainer(trainer_url)
-            trainer_id = self.fetch.fetch_trainer.one(url=trainer_url).id
         else:
-            if not self.fetch.fetch_trainer.exist(name=trainer_name):
+            trainer_id = trainer_name
+            if not self.fetch.fetch_trainer.exist(id=trainer_id):
                 self.store.store_trainer({
+                    "id": trainer_id,
                     "name": trainer_name,
                     "age": None,
                     "url": None
                 })
-            trainer_id = self.fetch.fetch_trainer.one(name=trainer_name).id
 
         horse["trainer_id"] = trainer_id
         self.store.store_horse(horse)
@@ -76,18 +78,19 @@ class DataCollector:
             jockey_url = p.get("jockey_url")
             if jockey_url:
                 jockey_url = jockey_url.lower()
-                if not self.fetch.fetch_jockey.exist(url=jockey_url):
+                jockey_id = extract_jockey_trainer_id_from_url(jockey_url)
+                if not self.fetch.fetch_jockey.exist(id=jockey_id):
                     self.get_jockey(jockey_url)
-                jockey_id = self.fetch.fetch_jockey.one(url=jockey_url).id
             else:
                 jockey_name = p["jockey_name"]
-                if not self.fetch.fetch_jockey.exist(name=jockey_name):
+                jockey_id = jockey_name
+                if not self.fetch.fetch_jockey.exist(id=jockey_id):
                     self.store.store_jockey({
+                        "id": jockey_id,
                         "name": jockey_name,
                         "age": None,
                         "url": None
                     })
-                jockey_id = self.fetch.fetch_jockey.one(name=jockey_name).id
 
             p["jockey_id"] = jockey_id
             p["rating"] = self.scraper.scrape_participation_rating(horse_url, p["race_id"])
@@ -98,12 +101,14 @@ class DataCollector:
         jockey = self.scraper.scrape_trainer_jockey(url)
         if jockey is None:
             return
+        jockey["id"] = extract_jockey_trainer_id_from_url(url)
         self.store.store_jockey(jockey)
 
     def get_trainer(self, url):
         trainer = self.scraper.scrape_trainer_jockey(url)
         if trainer is None:
             return
+        trainer["id"] = extract_jockey_trainer_id_from_url(url)
         self.store.store_trainer(trainer)
 
     def collect_all_horses_at_location(self, location):
@@ -117,7 +122,7 @@ class DataCollector:
         all_urls = []
         if self.race_url_found:
             with open(self.race_url_save_path, "r") as f:
-                all_urls = f.readlines()
+                all_urls = f.read().split("\n")
         else:
             for i in tqdm(range(time_diff.days), desc="Building races urls..."):
                 current_date = start_date + timedelta(days=i)

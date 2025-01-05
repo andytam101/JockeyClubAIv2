@@ -77,4 +77,3 @@ class Fetch:
         self.fetch_trainer = _FetchDB(Trainer)
         self.fetch_training = _FetchDB(Training)
         self.fetch_winnings = _FetchDB(Winnings)
-        

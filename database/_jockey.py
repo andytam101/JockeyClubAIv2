@@ -7,7 +7,7 @@ from ._base import Base
 class Jockey(Base):
     __tablename__ = 'jockey'
 
-    id   = Column(Integer, primary_key=True, autoincrement=True)
+    id   = Column(String, primary_key=True)
     name = Column(String, unique=True)
     age  = Column(Integer)
     url  = Column(String)

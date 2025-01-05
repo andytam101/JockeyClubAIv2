@@ -93,11 +93,14 @@ class Store:
 
     def store_jockey(self, jockey_data):
         with self._get_session() as session:
-            jockey = session.query(Jockey).filter(Jockey.name == jockey_data['name']).one_or_none()
+            jockey = session.query(Jockey).filter(Jockey.id == jockey_data['id']).one_or_none()
             if jockey:
-                jockey.age = jockey_data['age']
+                jockey.name = jockey_data.get('name', jockey.name)
+                jockey.age = jockey_data.get('age', jockey.age)
+                jockey.url = jockey_data.get('url', jockey.url)
             else:
                 new_jockey = Jockey(
+                    id=jockey_data["id"],
                     name=jockey_data['name'],
                     age=jockey_data['age'],
                     url=jockey_data['url'],
@@ -106,11 +109,14 @@ class Store:
 
     def store_trainer(self, trainer_data):
         with self._get_session() as session:
-            trainer = session.query(Trainer).filter(Trainer.name == trainer_data['name']).one_or_none()
+            trainer = session.query(Trainer).filter(Trainer.id == trainer_data['id']).one_or_none()
             if trainer:
-                trainer.age = trainer_data['age']
+                trainer.name = trainer_data.get('name', trainer.name)
+                trainer.age = trainer_data.get('age', trainer.age)
+                trainer.url = trainer_data.get('url', trainer.url)
             else:
                 new_trainer = Trainer(
+                    id=trainer_data['id'],
                     name=trainer_data['name'],
                     age=trainer_data['age'],
                     url=trainer_data['url'],
@@ -137,6 +143,7 @@ class Store:
                 Participation.race_id == participation_data["race_id"]).one_or_none()
             if p is not None:
                 p.lane = participation_data.get('lane', p.lane)
+                p.number = participation_data.get('number', p.number)
                 p.rating = participation_data.get('rating', p.rating)
                 p.gear_weight = participation_data.get('gear_weight', p.gear_weight)
                 p.horse_weight = participation_data.get('horse_weight', p.horse_weight)
@@ -148,6 +155,7 @@ class Store:
                 new_participation = Participation(
                     horse_id=participation_data['horse_id'],
                     race_id=participation_data['race_id'],
+                    number=participation_data['number'],
                     lane=participation_data['lane'],
                     rating=participation_data['rating'],
                     gear_weight=participation_data['gear_weight'],

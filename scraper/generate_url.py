@@ -35,7 +35,7 @@ def generate_all_horse_url(location):
 
 def convert_trainer_win_stat_to_profile(url: str):
     url = url.replace("TrainerWinStat", "TrainerProfile").lower()
-    return url.split("&season=")[0]
+    return url
 
 
 def generate_upcoming_race_url(num):
