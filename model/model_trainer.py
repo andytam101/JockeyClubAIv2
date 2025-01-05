@@ -116,7 +116,6 @@ class ModelTrainer:
 
             if (epoch + 1) % 100 == 0:
                 print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
-                print(cv_predictions)
 
         return train_hist, cv_hist
 
