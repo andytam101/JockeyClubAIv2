@@ -62,6 +62,9 @@ class Scraper:
                 # retired horse
                 result = self._read_retired_horse(url)
                 result["retired"] = True
+            elif len(profile.find_elements(By.TAG_NAME, "table")) == 4:
+                result = self._read_retired_horse(url)
+                result["retired"] = False
             else:
                 # active horse
                 result = self._read_active_horse(url)
@@ -80,6 +83,7 @@ class Scraper:
                 trainer_url = convert_trainer_win_stat_to_profile(result["trainer_url"])
                 result["trainer_url"] = trainer_url
         except Exception as e:
+            raise e
             e_str = str(e).split("\n")[0]
             self.logger.error(f"Failed to read horse url: {url}. Error: {e_str}")
             return
@@ -157,7 +161,8 @@ class Scraper:
         driver.get(url)
         profile = driver.find_element(By.CLASS_NAME, "horseProfile")
 
-        eng_name, horse_id, _ = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
+        name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
+        eng_name, horse_id = name_id[0], name_id[1]
         eng_name = eng_name.strip()
         horse_id = horse_id.strip().rstrip(")")  # remove closing bracket
 
@@ -464,6 +469,7 @@ class Scraper:
                 continue
 
             horse = cells[2]
+            number = int(cells[0].text)
             gear_weight = int(cells[3].text)
             jockey = cells[4]
             lane = int(cells[5].text)
@@ -471,6 +477,7 @@ class Scraper:
             rating = int(cells[7].text)
             horse_weight = int(cells[9].text)
 
+            this_p["number"] = number
             this_p["gear_weight"] = gear_weight
             this_p["horse_weight"] = horse_weight
             this_p["rating"] = rating
