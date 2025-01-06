@@ -1,7 +1,7 @@
-from dataloader.simple_loader import SimpleLoader
+from dataloader.participation_ranking_loader import ParticipationRankingLoader
 
 dataloader_dict = {
-    "SimpleLoader": SimpleLoader,
+    "PRL": ParticipationRankingLoader,
 }
 
 

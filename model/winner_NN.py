@@ -7,7 +7,7 @@ import os
 from tabulate import tabulate
 from wcwidth import wcswidth
 
-from dataloader import SimpleLoader
+from dataloader import ParticipationRankingLoader
 from ._model import _Model
 from utils.utils import pad_chinese
 
@@ -16,19 +16,30 @@ class WinnerNN(_Model):
     def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(self.dataloader.input_features, 32)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.dropout1 = nn.Dropout(0.4)
+
         self.fc2 = nn.Linear(32, 16)
+        self.bn2 = nn.BatchNorm1d(16)
+        self.dropout2 = nn.Dropout(0.4)
         self.output = nn.Linear(16, 1)
 
     @staticmethod
     def _dataloader():
-        return SimpleLoader()
+        return ParticipationRankingLoader()
 
     def optimizer(self):
-        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
+        return optim.Adam(self.parameters(), lr=0.0001, weight_decay=0.05)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
+        x = self.bn1(x)
+        x = self.dropout1(x)
+
         x = torch.relu(self.fc2(x))
+        x = self.bn2(x)
+        x = self.dropout2(x)
+
         return torch.sigmoid(self.output(x))
 
     @staticmethod

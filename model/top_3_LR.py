@@ -6,7 +6,7 @@ import torch.optim as optim
 import os
 
 from model._model import _Model
-from dataloader.simple_loader import SimpleLoader
+from dataloader.participation_ranking_loader import ParticipationRankingLoader
 
 
 class Top3LR(_Model):
@@ -28,7 +28,7 @@ class Top3LR(_Model):
 
     @staticmethod
     def _dataloader():
-        return SimpleLoader()
+        return ParticipationRankingLoader()
 
     def _optimizer(self):
         return optim.SGD(self.parameters(), lr=0.01, momentum=0.9)

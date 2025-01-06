@@ -3,6 +3,8 @@ from model.model_trainer import ModelTrainer
 
 from argparse import ArgumentParser
 
+import matplotlib.pyplot as plt
+
 
 def parse_args():
     parser = ArgumentParser()
@@ -33,7 +35,14 @@ def main():
     print(f"Final train acc: {train_acc:.4f}")
     print(f"Final cv cost: {cv_cost:.4f}")
     print(f"Final cv acc: {cv_acc:.4f}")
+    train_cost = list(map(lambda x: x[0], train_hist))
+    cv_cost = list(map(lambda x: x[0], cv_hist))
+    print(f"Minimum cv cost: {min(cv_cost):.4f}")
 
+    plt.plot(range(len(train_cost)), train_cost, label="train")
+    plt.plot(range(len(cv_cost)), cv_cost, label="cv")
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     main()

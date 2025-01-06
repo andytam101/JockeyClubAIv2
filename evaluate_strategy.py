@@ -225,19 +225,16 @@ def main():
     warnings.filterwarnings("ignore", category=FutureWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    model_dir = "trained_models/winner_nn_timed"
+    model_dir = "trained_models/PRL_nn_epoch_10000"
     strategies = [
         RandomWinnerStrategy(),
+        HighPWinnerStrategy(model_dir=model_dir, threshold=1.1, count=1),
         HighPWinnerStrategy(model_dir=model_dir, threshold=1.3, count=1),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.35, count=1),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.4, count=1),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.45, count=1),
         HighPWinnerStrategy(model_dir=model_dir, threshold=1.5, count=1),
-
-        # HighEVWinnerStrategy(model_dir=model_dir),
-        # PevWinnerStrategy(model_dir=model_dir, w=0.25),
-        # PevWinnerStrategy(model_dir=model_dir, w=0.50),
-        # PevWinnerStrategy(model_dir=model_dir, w=0.75),
+        HighEVWinnerStrategy(model_dir=model_dir),
+        PevWinnerStrategy(model_dir=model_dir, w=0.25),
+        PevWinnerStrategy(model_dir=model_dir, w=0.50),
+        PevWinnerStrategy(model_dir=model_dir, w=0.75),
     ]
 
     results = []

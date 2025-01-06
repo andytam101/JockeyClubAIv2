@@ -114,7 +114,7 @@ class ModelTrainer:
             train_hist.append((loss.item(), train_accuracy))
             cv_hist.append((cv_loss.item(), cv_accuracy))
 
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 1000 == 0:
                 print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
         return train_hist, cv_hist

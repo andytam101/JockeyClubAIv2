@@ -8,7 +8,7 @@ from tabulate import tabulate
 from wcwidth import wcswidth
 
 from model._model import _Model
-from dataloader.simple_loader import SimpleLoader
+from dataloader.participation_ranking_loader import ParticipationRankingLoader
 from utils.utils import pad_chinese
 
 
@@ -28,7 +28,7 @@ class Top3NN(_Model):
 
     @staticmethod
     def _dataloader():
-        return SimpleLoader()
+        return ParticipationRankingLoader()
 
     def optimizer(self):
         return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
