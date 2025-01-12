@@ -9,21 +9,40 @@ class Loader(ABC):
         session.close()
         self._save(output_dir, x, y)
 
+    @property
+    @abstractmethod
+    def input_features(self):
+        raise NotImplementedError()
+
     @abstractmethod
     def _load_from_db(self, session, start_date=None, end_date=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def load_predict(self, fetch, data):
+    def load_predict(self, session, data):
         raise NotImplementedError()
 
-    @abstractmethod
     def train_normalize(self, train_x):
-        raise NotImplementedError()
+        train_mean = np.mean(train_x, axis=0)
+        train_std = np.std(train_x, axis=0)
+        train_std[train_std == 0] = 1
+        self.normalize(train_x, train_mean=train_mean, train_std=train_std)
 
-    @abstractmethod
-    def normalize(self, x, **kwargs):
-        raise NotImplementedError()
+        return {
+            "train_mean": train_mean,
+            "train_std": train_std
+        }
+
+    @staticmethod
+    def normalize(x, **kwargs):
+        try:
+            train_mean = kwargs['train_mean']
+            train_std = kwargs['train_std']
+        except KeyError as e:
+            print("Missing train_mean or train_std argument")
+            raise e
+
+        x[:] = (x - train_mean) / train_std
 
     @staticmethod
     def _save(output_dir, data_x, data_y):

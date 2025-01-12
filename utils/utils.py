@@ -1,5 +1,6 @@
 from datetime import datetime
 from wcwidth import wcswidth
+import numpy as np
 
 
 def calc_season(day=datetime.now()):
@@ -25,3 +26,11 @@ def pad_chinese(text, width):
     current_width = wcswidth(text)
     return text + " " * (width - current_width)
 
+
+def randomize_odds(actual_odds):
+    upper_bound = actual_odds * 1.25
+    lower_bound = actual_odds * 0.75
+    return float(np.random.uniform(upper_bound, lower_bound, 1)[0])
+
+
+MAX_NUMBER_OF_HORSES = 14

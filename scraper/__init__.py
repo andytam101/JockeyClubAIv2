@@ -6,6 +6,9 @@ from .generate_url import *
 from .utils import *
 
 import utils.utils as utils
+from utils.utils import MAX_NUMBER_OF_HORSES
+from utils.pools import *
+
 from datetime import datetime
 import logging
 
@@ -490,3 +493,157 @@ class Scraper:
             data.append(this_p)
 
         return data
+
+    def read_win_place_current_odds(self, url):
+
+        def read_odds_from_row(row_odds):
+            cols = row_odds.find_elements(By.TAG_NAME, "td")
+            number = int(cols[0].text)
+
+            try:
+                win_odds = float(cols[7].text)
+            except ValueError:
+                win_odds = None
+            try:
+                place_odds = float(cols[8].text)
+            except ValueError:
+                place_odds = None
+
+            return {
+                "combination": number,
+                "win_odds": win_odds,
+                "place_odds": place_odds,
+            }
+
+        assert url.islower()
+        driver = self.driver
+        driver.get(url)
+        driver.implicitly_wait(2)
+
+        table = driver.find_element(By.CLASS_NAME, "rc-odds-table")
+
+        # remove last one as last one says "Field"
+        rows = table.find_elements(By.CLASS_NAME, "rc-odds-row")[:-1]
+        win_odds = []
+        place_odds = []
+        for row in rows:
+            data = read_odds_from_row(row)
+            win_odds.append({
+                "combination": data["combination"],
+                "odds": data["win_odds"],
+            })
+
+            place_odds.append({
+                "combination": data["combination"],
+                "odds": data["place_odds"],
+            })
+
+        return win_odds, place_odds
+
+    def read_forecast_current_odds(self, url):
+        assert url.islower()
+
+        # ensure its forecast url
+        assert "fct" in url
+
+        driver = self.driver
+        driver.implicitly_wait(2)
+        driver.get(url)
+
+        table = driver.find_element(By.CLASS_NAME, "iwn-odds-slide-container")
+
+        result = []
+        done = False
+        for i in range(MAX_NUMBER_OF_HORSES):
+            for j in range(MAX_NUMBER_OF_HORSES):
+                if i == j:
+                    continue
+                fst_horse = i + 1
+                snd_horse = j + 1
+
+                html_id = f"qb_FCT_{fst_horse}_{snd_horse}"
+
+                try:
+                    try:
+                        odds = float(table.find_element(By.ID, html_id).text)
+                    except ValueError:
+                        odds = None
+                    result.append({
+                        "combination": (fst_horse, snd_horse),
+                        "odds": odds
+                    })
+                except NoSuchElementException:
+                    done = j == 0
+                    break
+            if done:
+                break
+
+        return result
+
+    def read_quinella_q_place_current_odds(self, url):
+        assert url.islower()
+
+        # ensure url is a quinella / quinella place url
+        assert "wpq" in url
+        driver = self.driver
+        driver.implicitly_wait(2)
+        driver.get(url)
+        tables = driver.find_element(By.CLASS_NAME, "qin-odds-slide-container")
+
+        qin_odds = []
+        qpl_odds = []
+        done = False
+        for i in range(MAX_NUMBER_OF_HORSES - 1):
+            for j in range(i+1, MAX_NUMBER_OF_HORSES):
+                first_horse = i + 1
+                second_horse = j + 1
+
+                html_qin_id = f"qb_QIN_{first_horse}_{second_horse}"
+                html_qpl_id = f"qb_QPL_{first_horse}_{second_horse}"
+
+                try:
+                    try:
+                        this_qin_odd = float(tables.find_element(By.ID, html_qin_id).text)
+                    except ValueError:
+                        this_qin_odd = None
+                    try:
+                        this_qpl_odd = float(tables.find_element(By.ID, html_qpl_id).text)
+                    except ValueError:
+                        this_qpl_odd = None
+                except NoSuchElementException:
+                    done = j == i + 1
+                    break
+
+                qin_odds.append({
+                    "combination": (first_horse, second_horse),
+                    "odds": this_qin_odd,
+                })
+
+                qpl_odds.append({
+                    "combination": (first_horse, second_horse),
+                    "odds": this_qpl_odd,
+                })
+
+            if done:
+                break
+
+        return qin_odds, qpl_odds
+
+    @staticmethod
+    def add_pool_to_list_of_dict(odds, pool):
+        for odd in odds:
+            odd.update({"pool": pool})
+
+    def scrape_current_odds(self, url, pool):
+        assert url.islower()
+
+        if pool in {WIN, PLACE}:
+            return self.read_win_place_current_odds(url)
+        elif pool in {QUINELLA, Q_PLACE}:
+            qin_qpl_url = convert_win_odds_url(url, QUINELLA)
+            return self.read_quinella_q_place_current_odds(qin_qpl_url)
+        elif pool == FORECAST:
+            forecast_url = convert_win_odds_url(url, FORECAST)
+            return self.read_forecast_current_odds(forecast_url)
+        else:
+            raise ValueError("Pool must be one of WIN, PLACE, Q_PLACE, FORECAST (for now)")

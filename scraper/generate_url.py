@@ -1,4 +1,5 @@
 from datetime import datetime
+from utils.pools import *
 
 
 def generate_race_url(day, number=1):
@@ -43,3 +44,27 @@ def generate_upcoming_race_url(num):
     upcoming_race_base_url = "https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx"
     url = upcoming_race_base_url + f"?RaceDate={datetime.strftime(datetime.today(), '%Y/%m/%d')}" + f"&RaceNo={num}"
     return url.lower()
+
+def convert_win_odds_url(url: str, pool):
+    # ensure consistency of url
+    assert url.islower()
+
+    # ensure url is a win / place win odds url
+    assert "racing/wp" in url
+
+    if pool in {WIN, PLACE}:
+        return url
+    elif pool in {QUINELLA, Q_PLACE}:
+        return url.replace("wp", "wpq")
+    elif pool == FORECAST:
+        return url.replace("wp", "fct")
+    elif pool == TIERCE:
+        return url.replace("wp", "tce")
+    elif pool == TRIO:
+        return url.replace("wp", "tri")
+    elif pool == FIRST_4:
+        return url.replace("wp", "ff")
+    elif pool == QUARTET:
+        return url.replace("wp", "ff")
+    else:
+        raise Exception(f"Unsupported pool: {pool}")

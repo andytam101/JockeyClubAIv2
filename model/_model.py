@@ -62,3 +62,7 @@ class _Model(nn.Module, ABC):
     @abstractmethod
     def display_results(self, **kwargs):
         raise NotImplementedError
+
+    @abstractmethod
+    def format_predictions_for_race(self, combinations, predictions):
+        raise NotImplementedError

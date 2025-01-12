@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import torch
 
 from ._model import _Model
@@ -20,13 +22,19 @@ class ModelPrediction:
         self.model.load_state_dict(model_state_dict)
 
     def predict(self, session, data):
-        x = self.dataloader.load_predict(session, data)
+        combinations, x = self.dataloader.load_predict(session, data)
         params = self.model.load_normalization(self.model_dir)
         self.dataloader.normalize(x, **params)
         x = torch.tensor(x, dtype=torch.float32, device=device)
+
+        self.model.eval()
         predictions = self.model(x)
         formatted_predictions = self.model.reformat_predictions(predictions)
-        return formatted_predictions
+        return combinations, formatted_predictions
+
+    def guess_outcome_of_race(self, session, data):
+        combinations, predictions = self.predict(session, data)
+        return self.model.format_predictions_for_race(combinations, predictions)
 
     def display_results(self, **kwargs):
         self.model.display_results(**kwargs)

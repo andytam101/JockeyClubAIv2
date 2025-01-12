@@ -7,9 +7,10 @@ import os
 from tabulate import tabulate
 from wcwidth import wcswidth
 
-from model._model import _Model
-from dataloader.participation_ranking_loader import ParticipationRankingLoader
+from dataloader import ParticipationRankingLoader
+from ._model import _Model
 from utils.utils import pad_chinese
+from utils.pools import *
 
 
 class Top3NN(_Model):
@@ -17,25 +18,37 @@ class Top3NN(_Model):
     Top 3 single class classification. Feedforward Neural Network.
     Input vector: TODO: fill in input vector in comments
     """
+
     def __init__(self):
-        super(Top3NN, self).__init__()
-        self.fc1 = nn.Linear(self.dataloader.input_features, 32)
-        self.fc2 = nn.Linear(32, 16)
-        self.output = nn.Linear(16, 1)
+        super().__init__()
+        self.fc1 = nn.Linear(self.dataloader.input_features, 64)
+        self.bn1 = nn.BatchNorm1d(64)
+        self.dropout1 = nn.Dropout(0.2)
+
+        self.fc2 = nn.Linear(64, 32)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.dropout2 = nn.Dropout(0.2)
+        self.output = nn.Linear(32, 1)
 
     def __repr__(self):
-        return "Top 3 Feedforward Neural Network"
+        return "Top 3 Neural Network"
 
     @staticmethod
     def _dataloader():
         return ParticipationRankingLoader()
 
     def optimizer(self):
-        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
+        return optim.Adam(self.parameters(), lr=0.003)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
+        # x = self.bn1(x)
+        # x = self.dropout1(x)
+
         x = torch.relu(self.fc2(x))
+        # x = self.bn2(x)
+        # x = self.dropout2(x)
+
         return torch.sigmoid(self.output(x))
 
     @staticmethod
@@ -68,6 +81,16 @@ class Top3NN(_Model):
         return {
             "train_mean": train_mean,
             "train_std": train_std
+        }
+
+    def format_predictions_for_race(self, combinations, predictions):
+        predictions = predictions.squeeze(1).tolist()
+        corresponding = list(zip(combinations, predictions))
+        corresponding.sort(key=lambda x: x[1], reverse=True)
+        top_3 = list(map(lambda x: x[0], corresponding[:3]))
+
+        return {
+            PLACE: top_3
         }
 
     def display_results(self, **kwargs):

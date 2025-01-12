@@ -10,6 +10,7 @@ from wcwidth import wcswidth
 from dataloader import ParticipationRankingLoader
 from ._model import _Model
 from utils.utils import pad_chinese
+from utils.pools import *
 
 
 class WinnerNN(_Model):
@@ -24,20 +25,25 @@ class WinnerNN(_Model):
         self.dropout2 = nn.Dropout(0.4)
         self.output = nn.Linear(16, 1)
 
+    def __repr__(self):
+        return "Winner Feedforward Neural Network."
+
     @staticmethod
     def _dataloader():
         return ParticipationRankingLoader()
 
     def optimizer(self):
-        return optim.Adam(self.parameters(), lr=0.0001, weight_decay=0.05)
+        return optim.Adam(self.parameters(), lr=0.01, weight_decay=0.014)
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
+        x = self.fc1(x)
         x = self.bn1(x)
+        x = torch.relu(x)
         x = self.dropout1(x)
 
-        x = torch.relu(self.fc2(x))
+        x = self.fc2(x)
         x = self.bn2(x)
+        x = torch.relu(x)
         x = self.dropout2(x)
 
         return torch.sigmoid(self.output(x))
@@ -72,6 +78,16 @@ class WinnerNN(_Model):
         return {
             "train_mean": train_mean,
             "train_std": train_std
+        }
+
+    def format_predictions_for_race(self, combinations, predictions: torch.tensor):
+        predictions = predictions.squeeze(1).tolist()
+        corresponding = list(zip(combinations, predictions))
+        winner_horse = max(corresponding, key=lambda x: x[1])
+
+        return {
+            WIN: winner_horse,
+            "ALL": dict(corresponding),
         }
 
     def display_results(self, **kwargs):

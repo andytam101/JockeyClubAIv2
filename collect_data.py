@@ -140,8 +140,13 @@ class DataCollector:
         for url in tqdm(all_urls, desc="Reading races"):
             self.get_race(url)
 
-    def collect_all_participations(self):
-        all_races_url = self.fetch.fetch_race.all_url()
+    def collect_all_participations(self, start_date=None, end_date=None):
+        races = self.fetch.fetch_race.all()
+        if start_date is not None:
+            races = list(filter(lambda x: x.date >= start_date, races))
+        if end_date is not None:
+            races = list(filter(lambda x: x.date < end_date, races))
+        all_races_url = list(map(lambda x: x.url, races))
         for url in tqdm(all_races_url, desc="Reading participations"):
             self.get_participations(url)
 
@@ -232,7 +237,10 @@ def main():
             data_collector.update_jockeys()
         else:
             print("Invalid item")
-
+    elif instruction in {"races"}:
+        data_collector.collect_all_races_from_date(start_date=datetime(2020, 9, 1),
+                                                   end_date=datetime(2022, 9, 1).date())
+        data_collector.collect_all_participations(start_date=datetime(2020, 9, 1).date(), end_date=datetime(2022, 9, 1).date())
 
 if __name__ == "__main__":
     main()

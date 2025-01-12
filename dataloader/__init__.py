@@ -1,7 +1,10 @@
+from dataloader.pairwise_loader import PairwiseLoader
 from dataloader.participation_ranking_loader import ParticipationRankingLoader
+import numpy as np
 
 dataloader_dict = {
-    "PRL": ParticipationRankingLoader,
+    "PRLoader": ParticipationRankingLoader,
+    "PairLoader": PairwiseLoader
 }
 
 

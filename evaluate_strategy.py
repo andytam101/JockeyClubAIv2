@@ -1,18 +1,25 @@
-from database import Participation, get_session, init_engine, Race
+from database import Participation, get_session, init_engine, Race, Winnings
 from database.fetch import Fetch
 import dataloader.utils as dataloader
 
 from strategy import *
 from strategy.HighEVWinnerStrategy import HighEVWinnerStrategy
-from strategy.HighPWinnerStrategy import HighPWinnerStrategy
+from strategy.HighPWinnerAbsoluteStrategy import HighPWinnerAbsoluteStrategy
+from strategy.HighPWinnerProportionStrategy import HighPWinnerProportionStrategy
+from strategy.HighPWinnerProgressiveStrategy import HighPWinnerProgressiveStrategy
 from strategy.RandomWinnerStrategy import RandomWinnerStrategy
 from strategy.PevWinnerStrategy import PevWinnerStrategy
+
+import matplotlib.pyplot as plt
 
 from datetime import datetime
 import warnings
 from tqdm import tqdm
 
 from utils import utils
+from utils.pools import *
+
+from tabulate import tabulate
 
 
 def is_solo(target, bet):
@@ -32,102 +39,54 @@ def is_ordered(target, bet):
     return target == bet_str or target == "-"
 
 
-def calculate_one_pool_payout(validate_func, winnings, bets):
-    # bets is a dictionary where key = horse number, value = amount
-    target = winnings.combination
-    res = 0
-    number_won = 0
-    for bet in bets:
-        amount = bets[bet]
-        if amount > 0 and validate_func(target, bet):
-            res += winnings.amount * amount / 10
-            number_won += 1
-
-        res -= amount
-
-    return res, number_won
+def calculate_payout(validate_func, winning, bet_combination, amount):
+    target_combination = winning.combination
+    win_odds = winning.amount / 10
+    if validate_func(target_combination, bet_combination):
+        return float(win_odds) * amount - amount
+    else:
+        return -amount
 
 
-def calculate_payout(
-        fetch,
+def calculate_one_bet_payout(
+        session,
         race_id,
-        win=None,
-        place=None,
-        quinella=None,
-        quinella_place=None,
-        forecast=None,
-        tierce=None,
-        trio=None,
-        first_4=None,
-        quartet=None
+        bet_combination,
+        amount,
+        pool: str,
 ):
-    payouts = fetch.fetch_winnings(race_id=race_id)
+    payouts = session.query(Winnings).filter(Winnings.race_id == race_id).all()
     get_one = lambda x: list(filter(lambda y: y.pool == x, payouts))[0]
     get_all = lambda x: list(filter(lambda y: y.pool == x, payouts))
+    pool = pool.upper()
 
-    total = 0
-    total_won_count = 0
-
-    if win is not None:
-        winning = get_one("WIN")
-        p, won_count = calculate_one_pool_payout(is_solo, winning, win)
-        total += p
-        total_won_count += won_count
-
-    if place is not None:
-        winnings = get_all("PLACE")
-        for winning in winnings:
-            p, won_count = calculate_one_pool_payout(is_solo, winning, place)
-            total += p
-            total_won_count += won_count
-
-    if quinella is not None:
-        winning = get_one("QUINELLA")
-        p, won_count = calculate_one_pool_payout(is_unordered, winning, quinella)
-        total += p
-        total_won_count += won_count
-
-    if quinella_place is not None:
-        winnings = get_all("QUINELLA PLACE")
-        for winning in winnings:
-            p, won_count = calculate_one_pool_payout(is_unordered, winning, quinella_place)
-            total += p
-            total_won_count += won_count
-
-    if forecast is not None:
-        winning = get_one("FORECAST")
-        p, won_count = calculate_one_pool_payout(is_ordered, winning, forecast)
-        total += p
-        total_won_count += won_count
-
-    if tierce is not None:
-        winning = get_one("TIERCE")
-        p, won_count = calculate_one_pool_payout(is_ordered, winning, tierce)
-        total += p
-        total_won_count += won_count
-
-    if trio is not None:
-        winning = get_one("TRIO")
-        p, won_count = calculate_one_pool_payout(is_unordered, winning, trio)
-        total += p
-        total_won_count += won_count
-
-    if first_4 is not None:
-        winning = get_one("FIRST 4")
-        p, won_count = calculate_one_pool_payout(is_unordered, winning, first_4)
-        total += p
-        total_won_count += won_count
-
-    if quartet is not None:
-        winning = get_one("QUARTET")
-        p, won_count = calculate_one_pool_payout(is_ordered, winning, quartet)
-        total += p
-        total_won_count += won_count
-
-    return {
-        "profit": total,
-        "number_won": total_won_count
-    }
+    if pool == WIN:
+        winning = get_one(WIN)
+        return calculate_payout(is_solo, winning, bet_combination, amount)
+    elif pool == PLACE:
+        raise NotImplementedError()
+    elif pool == QUINELLA:
+        winning = get_one(QUINELLA)
+        return calculate_payout(is_unordered, winning, bet_combination, amount)
+    elif pool == Q_PLACE:
+        raise NotImplementedError()
+    elif pool == FORECAST:
+        winning = get_one(FORECAST)
+        return calculate_payout(is_ordered, winning, bet_combination, amount)
+    elif pool == TRIO:
+        winning = get_one(TRIO)
+        return calculate_payout(is_unordered, winning, bet_combination, amount)
+    elif pool == TIERCE:
+        winning = get_one(TIERCE)
+        return calculate_payout(is_ordered, winning, bet_combination, amount)
+    elif pool == FIRST_4:
+        winning = get_one(FIRST_4)
+        return calculate_payout(is_unordered, winning, bet_combination, amount)
+    elif pool == QUARTET:
+        winning = get_one(QUARTET)
+        return calculate_payout(is_ordered, winning, bet_combination, amount)
+    else:
+        raise Exception("Invalid pool")
 
 
 def simulate_upcoming_race(race):
@@ -146,14 +105,30 @@ def simulate_upcoming_race(race):
             "horse_weight": p.horse_weight,
 
             # TODO: add variance to win odds to simulate uncertainty in betting
-            "win_odds": p.win_odds,
+            "win_odds": utils.randomize_odds(float(p.win_odds)),
 
             "date": race.date,
             "race_class": dataloader.convert_race_class(race.race_class),
             "distance": race.distance,
             "total_bet": race.total_bet,
             "trainer_id": p.horse.trainer_id,
+            "number_of_horses": len(ps),
+            "opponents": []
         }
+
+        opponents = utils.remove_unranked_participants(p.race.participations)
+        opponents = list(filter(lambda x: x.horse_id != p.horse_id, opponents))
+
+        for opponent in opponents:
+            this_p["opponents"].append({
+                "horse_id": opponent.horse_id,
+                "jockey_id": opponent.jockey_id,
+                "rating": opponent.rating,
+                "gear_weight": opponent.gear_weight,
+                "horse_weight": opponent.horse_weight,
+                "win_odds": opponent.win_odds,
+            })
+
         data.append(this_p)
 
     return data
@@ -172,51 +147,81 @@ def count_bets(bets):
 def evaluate_strategy(strategy, start_date, end_date=datetime.today().date()):
     session = get_session()
     all_races = session.query(Race).filter(Race.date >= start_date).filter(Race.date <= end_date).all()
-    all_bets = []
+
+    number_won = 0
+    number_bets = 0
+    number_of_races = 0
+
+    balance_history = [strategy.init_balance]
+
+    done = False
     for race in tqdm(all_races, desc=f"{strategy}"):
         data = simulate_upcoming_race(race)
         data.sort(key=lambda x: x["number"])
-        all_bets.append({
-            "race_id": race.id,
-            "bets": strategy.bet(session, data)
-        })
+        bet = strategy.bet(session, data)
+
+        race_amount_bet = 0
+        for pool in bet:
+            for combination in bet[pool]:
+                amount = bet[pool][combination]
+                if amount <= 0:
+                    continue
+                payout = calculate_one_bet_payout(session, race.id, combination, amount, pool)
+                if payout > 0:
+                   number_won += 1
+                race_amount_bet += amount
+                number_bets += 1
+                strategy.update_balance(payout)
+                if strategy.balance <= 0:
+                    done = True
+                    break
+            if done:
+                break
+        if race_amount_bet > 0:
+            number_of_races += 1
+        balance_history.append(strategy.balance)
+        if done:
+            break
+
     session.close()
 
-    profit = 0
-    number_won = 0
-    number_bets = 0
-
-    fetch = Fetch()
-    for bet in all_bets:
-        this_result = calculate_payout(fetch, bet["race_id"], **bet["bets"])
-        profit += this_result["profit"]
-        number_won += this_result["number_won"]
-        number_bets += count_bets(bet["bets"])
-
-
     return {
-        "profit": profit,
-        "number_of_races": len(all_races),
+        "total_number_of_races": len(all_races),
+        "number_of_races": number_of_races,
         "number_of_bets": number_bets,
         "number_won": number_won,
+        "history": balance_history,
     }
-
 
 def display_results(strategy, result):
     strategy_name = f" {strategy} "
-    header = f"{strategy_name.center(75, "=")}"
+    final_balance = strategy.balance
+    initial_balance = strategy.init_balance
+    profit = final_balance - initial_balance
+    percentage = profit / initial_balance * 100
+
+    header = f"{strategy_name.center(100, "=")}"
     if result['number_of_bets'] > 0:
         accuracy = result["number_won"] / result['number_of_bets']
     else:
         accuracy = 0
 
     print(header)
-    print(f"Profit: {result["profit"]}")
-    print(f"Total number of races: {result['number_of_races']}")
+    print(f"Initial balance: {initial_balance:.2f}")
+    print(f"Final Balance: {final_balance:.2f}")
+    print(f"Profit: {profit:.2f}")
+    print(f"Percentage change: {percentage:.2f}%")
+    print(f"Total number of races: {result['total_number_of_races']}")
+    print(f"Number of races bet: {result['number_of_races']}")
     print(f"Total number of bets: {result['number_of_bets']}")
-    print(f"Total number won: {result['number_won']}")
+    print(f"Total number of bets won: {result['number_won']}")
+    print(f"Max balance reached: {max(result["history"])}")
     print(f"Accuracy: {accuracy * 100:.3f}%")
     print()
+
+    balance_history = result["history"]
+    plt.plot(range(len(balance_history)), balance_history)
+    plt.show()
 
 
 def main():
@@ -225,16 +230,30 @@ def main():
     warnings.filterwarnings("ignore", category=FutureWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    model_dir = "trained_models/PRL_nn_epoch_10000"
+    model_dir = "trained_models/winner_nn_opponents_epoch_10000"
     strategies = [
-        RandomWinnerStrategy(),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.1, count=1),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.3, count=1),
-        HighPWinnerStrategy(model_dir=model_dir, threshold=1.5, count=1),
-        HighEVWinnerStrategy(model_dir=model_dir),
-        PevWinnerStrategy(model_dir=model_dir, w=0.25),
-        PevWinnerStrategy(model_dir=model_dir, w=0.50),
-        PevWinnerStrategy(model_dir=model_dir, w=0.75),
+        # RandomWinnerStrategy(),
+        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0, count=1),
+
+        # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0.9, count=1),
+        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.3, count=1),
+
+        # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=0.9, count=1),
+        HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.3, count=1),
+        #
+        # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=0.9, count=1),
+        HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.3, count=1),
+
+        # HighEVWinnerStrategy(model_dir=model_dir),
+        # PevWinnerStrategy(model_dir=model_dir, w=0.25),
+        # PevWinnerStrategy(model_dir=model_dir, w=0.50),
+        # PevWinnerStrategy(model_dir=model_dir, w=0.75),
     ]
 
     results = []
@@ -246,7 +265,6 @@ def main():
 
     for i in range(len(results)):
         display_results(strategies[i], results[i])
-
 
 if __name__ == '__main__':
     main()
