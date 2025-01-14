@@ -1,4 +1,5 @@
 from model.log_ranking_NN import LogRankingNN
+from model.pairwise_binary import PairwiseBinary
 from model.ranking_NN import RankingNN
 from model.top_3_NN import Top3NN
 from model.top_3_LR import Top3LR
@@ -11,6 +12,7 @@ model_dict = {
     "WinnerNN": WinnerNN,
     "RankingNN": RankingNN,
     "LRankingNN": LogRankingNN,
+    "PairBinary": PairwiseBinary,
 }
 
 

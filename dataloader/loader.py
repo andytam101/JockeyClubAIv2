@@ -42,7 +42,7 @@ class Loader(ABC):
             print("Missing train_mean or train_std argument")
             raise e
 
-        x[:] = (x - train_mean) / train_std
+        x[:] = np.nan_to_num((x - train_mean) / train_std)
 
     @staticmethod
     def _save(output_dir, data_x, data_y):

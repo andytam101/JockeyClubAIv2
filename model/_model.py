@@ -5,6 +5,9 @@ from abc import ABC, abstractmethod
 from dataloader.loader import Loader as DataLoader
 from utils.config import device
 
+import numpy as np
+import os
+
 
 class _Model(nn.Module, ABC):
     def __init__(self):
@@ -47,13 +50,23 @@ class _Model(nn.Module, ABC):
     def reformat_predictions(predictions):
         return predictions
 
-    @abstractmethod
     def save_normalization(self, model_dir, **kwargs):
-        raise NotImplementedError
+        mean_path = os.path.join(model_dir, "train_mean.npy")
+        std_path = os.path.join(model_dir, "train_std.npy")
 
-    @abstractmethod
+        np.save(mean_path, kwargs["train_mean"])
+        np.save(std_path, kwargs["train_std"])
+
     def load_normalization(self, model_dir):
-        raise NotImplementedError
+        mean_path = os.path.join(model_dir, "train_mean.npy")
+        std_path = os.path.join(model_dir, "train_std.npy")
+
+        train_mean = np.load(mean_path)
+        train_std = np.load(std_path)
+        return {
+            "train_mean": train_mean,
+            "train_std": train_std
+        }
 
     @abstractmethod
     def process_y(self, y):

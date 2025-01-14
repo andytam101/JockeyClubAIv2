@@ -22,8 +22,13 @@ class WinnerNN(_Model):
 
         self.fc2 = nn.Linear(32, 16)
         self.bn2 = nn.BatchNorm1d(16)
-        self.dropout2 = nn.Dropout(0.4)
-        self.output = nn.Linear(16, 1)
+        self.dropout2 = nn.Dropout(0.3)
+
+        self.fc3 = nn.Linear(16, 8)
+        self.bn3 = nn.BatchNorm1d(8)
+        self.dropout3 = nn.Dropout(0.2)
+
+        self.output = nn.Linear(8, 1)
 
     def __repr__(self):
         return "Winner Feedforward Neural Network."
@@ -33,18 +38,18 @@ class WinnerNN(_Model):
         return ParticipationRankingLoader()
 
     def optimizer(self):
-        return optim.Adam(self.parameters(), lr=0.01, weight_decay=0.014)
+        return optim.Adam(self.parameters(), lr=0.001, weight_decay=0.005)
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.bn1(x)
+        # x = self.bn1(x)
         x = torch.relu(x)
-        x = self.dropout1(x)
+        # x = self.dropout1(x)
 
         x = self.fc2(x)
-        x = self.bn2(x)
+        # x = self.bn2(x)
         x = torch.relu(x)
-        x = self.dropout2(x)
+        # x = self.dropout2(x)
 
         return torch.sigmoid(self.output(x))
 
@@ -61,24 +66,6 @@ class WinnerNN(_Model):
 
     def process_y(self, y):
         return (y == 1).astype(np.float32).reshape(-1, 1)
-
-    def save_normalization(self, model_dir, **kwargs):
-        mean_path = os.path.join(model_dir, "train_mean.npy")
-        std_path = os.path.join(model_dir, "train_std.npy")
-
-        np.save(mean_path, kwargs["train_mean"])
-        np.save(std_path, kwargs["train_std"])
-
-    def load_normalization(self, model_dir):
-        mean_path = os.path.join(model_dir, "train_mean.npy")
-        std_path = os.path.join(model_dir, "train_std.npy")
-
-        train_mean = np.load(mean_path)
-        train_std = np.load(std_path)
-        return {
-            "train_mean": train_mean,
-            "train_std": train_std
-        }
 
     def format_predictions_for_race(self, combinations, predictions: torch.tensor):
         predictions = predictions.squeeze(1).tolist()

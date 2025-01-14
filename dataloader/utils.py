@@ -4,7 +4,7 @@ from utils import utils
 import numpy as np
 from datetime import timedelta
 
-INDIVIDUAL_FEATURES = 45
+INDIVIDUAL_FEATURES = 55
 
 
 def get_training_participations(session, start_date=None, end_date=None):
@@ -87,7 +87,7 @@ def get_participation_data(p: Participation):
         p.lane,
         p.number,
         p.gear_weight,
-        p.rating if p.rating is not None else 25,
+        p.rating if p.rating is not None else 0,
         p.horse_weight,
     ]
 
@@ -162,6 +162,16 @@ def get_group_ranking(ps: list[Participation]):
     return [np.median(ranking), upper_quartile - lower_quartile]
 
 
+def get_group_rating(ps: list[Participation]):
+    if len(ps) == 0:
+        return [0, 0]
+    all_rating = []
+    for p in ps:
+        if p.rating is not None:
+            all_rating.append(p.rating)
+    return [np.mean(all_rating), np.std(all_rating)]
+
+
 def get_group_horse_weights(ps: list[Participation]):
     if len(ps) == 0:
         return [0, 0]
@@ -191,77 +201,33 @@ def get_group_top_ratio(ps: list[Participation], ranking=1):
     return top_count / total
 
 
-def get_grouped_stats(ps: list[Participation]):
-    # sort participations by racing date
-    ps.sort(key=lambda x: x.race.date, reverse=True)
+def get_latest_speed(ps: list[Participation]):
+    if len(ps) == 0:
+        return 0
+    latest_p = max(ps, key=lambda x: x.race.date)
+    speed = time_to_number_of_seconds(latest_p.finish_time) / latest_p.race.distance
+    return speed
 
-    dates = list(map(lambda x: x.race.date, ps))
 
-    speeds = list(map(lambda x: x.race.distance / time_to_number_of_seconds(x.finish_time), ps))
-    speeds_diff, speeds_derivative = (
-        calculate_change_and_derivative_by_date(speeds, dates))
+def get_latest_rating(ps: list[Participation]):
+    if len(ps) == 0:
+        return 0
+    latest_p = max(ps, key=lambda x: x.race.date)
+    return latest_p.rating
 
-    rankings = list(map(lambda x: get_ranking_from_participation(x) / len(
-        utils.remove_unranked_participants(x.race.participations)), ps))
 
-    top_1_count = len(list(filter(lambda k: k == 1, rankings)))
-    top_2_count = len(list(filter(lambda k: k <= 2, rankings)))
-    top_3_count = len(list(filter(lambda k: k <= 3, rankings)))
-    top_4_count = len(list(filter(lambda k: k <= 4, rankings)))
+def get_latest_horse_weight(ps: list[Participation]):
+    if len(ps) == 0:
+        return 0
+    latest_p = max(ps, key=lambda x: x.race.date)
+    return latest_p.horse_weight
 
-    # rating
-    ratings = list(map(lambda x: x.rating, ps))
-    ratings_diff, ratings_derivative = (
-        calculate_change_and_derivative_by_date(ratings, dates)
-    )
 
-    # weight changes
-    horse_weights = list(map(lambda x: x.horse_weight, ps))
-    horse_weights_diff, horse_weights_derivative = (
-        calculate_change_and_derivative_by_date(horse_weights, dates)
-    )
-
-    # win odds
-    win_odds = list(map(lambda x: x.win_odds, ps))
-    win_odds_diff, win_odds_derivative = (
-        calculate_change_and_derivative_by_date(win_odds, dates)
-    )
-
-    result = [
-        # number of participations
-        len(ps),
-
-        # latest speed stuff
-        0 if len(speeds) == 0 else speeds[0],
-        0 if len(speeds_diff) == 0 else speeds_diff[0],
-        0 if len(speeds_derivative) == 0 else speeds_derivative[0],
-
-        # top performance ratio
-        top_1_count / len(ps) if len(ps) > 0 else 0,
-        top_2_count / len(ps) if len(ps) > 0 else 0,
-        top_3_count / len(ps) if len(ps) > 0 else 0,
-        top_4_count / len(ps) if len(ps) > 0 else 0,
-
-        # latest ranking
-        0 if len(ps) == 0 else get_ranking_from_participation(ps[0]),
-
-        # latest rating
-        0 if len(ratings) == 0 else ratings[0],
-
-        # latest horse weight
-        0 if len(horse_weights) == 0 else horse_weights[0],
-
-        # latest win odds
-        0 if len(win_odds) == 0 else win_odds[0],
-    ]
-
-    result += get_mean_std(rankings)
-    result += get_mean_std(speeds)
-    result += get_mean_std(ratings)
-    result += get_mean_std(horse_weights)
-    result += get_mean_std(win_odds)
-
-    return result
+def get_latest_gear_weight(ps: list[Participation]):
+    if len(ps) == 0:
+        return 0
+    latest_p = max(ps, key=lambda x: x.race.date)
+    return latest_p.gear_weight
 
 
 def load_individual_participation(session, p: Participation):
@@ -289,22 +255,30 @@ def load_individual_participation(session, p: Participation):
     horse_ps_data = ([len(horse_ps)]
                      + get_group_speed(horse_ps)
                      + get_group_ranking(horse_ps)
+                     + get_group_rating(horse_ps)
                      + get_group_horse_weights(horse_ps)
                      + get_group_win_odds(horse_ps)
                      + [get_group_top_ratio(horse_ps, 1)]
                      + [get_group_top_ratio(horse_ps, 2)]
                      + [get_group_top_ratio(horse_ps, 3)]
-                     + [get_group_top_ratio(horse_ps, 4)])
+                     + [get_group_top_ratio(horse_ps, 4)]
+                     + [get_latest_speed(horse_ps)]
+                     + [get_latest_rating(horse_ps)]
+                     + [get_latest_horse_weight(horse_ps)])
 
     jockey_ps_data = ([len(jockey_ps)]
                       + get_group_speed(jockey_ps)
                       + get_group_ranking(jockey_ps)
+                      + get_group_rating(jockey_ps)
                       + get_group_gear_weights(jockey_ps)
                       + get_group_win_odds(jockey_ps)
                       + [get_group_top_ratio(jockey_ps, 1)]
                       + [get_group_top_ratio(jockey_ps, 2)]
                       + [get_group_top_ratio(jockey_ps, 3)]
-                      + [get_group_top_ratio(jockey_ps, 4)])
+                      + [get_group_top_ratio(jockey_ps, 4)]
+                      + [get_latest_speed(jockey_ps)]
+                      + [get_latest_rating(jockey_ps)]
+                      + [get_latest_gear_weight(jockey_ps)])
 
     trainer_speed_mean, _ = get_group_speed(trainer_ps)
     trainer_ranking_median, _ = get_group_ranking(trainer_ps)
@@ -349,7 +323,6 @@ def load_individual_predict(session, **kwargs):
     race_class = kwargs["race_class"]  # convert_race_class should have already been called
     distance = kwargs["distance"]
     total_bet = kwargs["total_bet"]
-    win_odds = kwargs["win_odds"]
     number_of_horses = kwargs["number_of_horses"]
 
     entry = np.zeros(INDIVIDUAL_FEATURES, dtype=np.float32)
@@ -385,22 +358,30 @@ def load_individual_predict(session, **kwargs):
     horse_ps_data = ([len(horse_ps)]
                      + get_group_speed(horse_ps)
                      + get_group_ranking(horse_ps)
+                     + get_group_rating(horse_ps)
                      + get_group_horse_weights(horse_ps)
                      + get_group_win_odds(horse_ps)
                      + [get_group_top_ratio(horse_ps, 1)]
                      + [get_group_top_ratio(horse_ps, 2)]
                      + [get_group_top_ratio(horse_ps, 3)]
-                     + [get_group_top_ratio(horse_ps, 4)])
+                     + [get_group_top_ratio(horse_ps, 4)]
+                     + [get_latest_speed(horse_ps)]
+                     + [get_latest_rating(horse_ps)]
+                     + [get_latest_horse_weight(horse_ps)])
 
     jockey_ps_data = ([len(jockey_ps)]
                       + get_group_speed(jockey_ps)
                       + get_group_ranking(jockey_ps)
+                      + get_group_rating(jockey_ps)
                       + get_group_gear_weights(jockey_ps)
                       + get_group_win_odds(jockey_ps)
                       + [get_group_top_ratio(jockey_ps, 1)]
                       + [get_group_top_ratio(jockey_ps, 2)]
                       + [get_group_top_ratio(jockey_ps, 3)]
-                      + [get_group_top_ratio(jockey_ps, 4)])
+                      + [get_group_top_ratio(jockey_ps, 4)]
+                      + [get_latest_speed(jockey_ps)]
+                      + [get_latest_rating(jockey_ps)]
+                      + [get_latest_gear_weight(jockey_ps)])
 
     trainer_speed_mean, _ = get_group_speed(trainer_ps)
     trainer_ranking_median, _ = get_group_ranking(trainer_ps)
@@ -425,4 +406,4 @@ def load_individual_predict(session, **kwargs):
         horse_ps_data + jockey_ps_data + trainer_ps_data
     )
 
-    return entry
+    return np.nan_to_num(entry)

@@ -6,6 +6,8 @@ from itertools import combinations
 from .utils import *
 from tqdm import tqdm
 
+import random
+
 
 class PairwiseLoader(Loader):
     @property
@@ -13,24 +15,61 @@ class PairwiseLoader(Loader):
         return INDIVIDUAL_FEATURES * 2
 
     def _load_from_db(self, session, start_date=None, end_date=None):
-        ps = get_training_participations(session, start_date, end_date)
-        n = len(ps)
+        races = session.query(Race)
+        if start_date is not None:
+            races = races.filter(Race.date >= start_date)
+        if end_date is not None:
+            races = races.filter(Race.date < end_date)
 
-        m = n * (n - 1) // 2
+        races = races.all()
+        m = 0
+        for race in races:
+            num_ps = len(utils.remove_unranked_participants(race.participations))
+            m += (num_ps * (num_ps - 1) // 2)
 
-        result_x = np.zeros((m, self.input_features), dtype=np.float32)
-        result_y = np.zeros((m, 2), dtype=np.float16)
+        data_x = np.zeros((m, self.input_features), dtype=np.float32)
+        data_y = np.zeros((m, 2), dtype=np.float32)
+        counter = 0
 
-        for first_idx in tqdm(range(n - 1), desc="Loading data"):
-            for snd_idx in range(first_idx + 1, n):
-                i = first_idx * n + snd_idx - first_idx
-                result_x[i, :INDIVIDUAL_FEATURES] = load_individual_participation(session, ps[first_idx])
-                result_x[i, INDIVIDUAL_FEATURES:] = load_individual_participation(session, ps[snd_idx])
+        for race in tqdm(races, desc="Loading data"):
+            ps = utils.remove_unranked_participants(race.participations)
+            for i in range(len(ps) - 1):
+                for j in range(i + 1, len(ps)):
+                    if random.random() < 0.5:
+                        first_p = ps[i]
+                        snd_p = ps[j]
+                    else:
+                        first_p = ps[j]
+                        snd_p = ps[i]
 
-                result_y[i, 0] = get_ranking_from_participation(ps[first_idx])
-                result_y[i, 1] = get_ranking_from_participation(ps[snd_idx])
+                    data_x[counter, :INDIVIDUAL_FEATURES] = load_individual_participation(session, first_p)
+                    data_x[counter, INDIVIDUAL_FEATURES:] = load_individual_participation(session, snd_p)
 
-        return np.nan_to_num(result_x)
+                    data_y[counter, 0] = get_ranking_from_participation(first_p)
+                    data_y[counter, 1] = get_ranking_from_participation(snd_p)
+
+                    counter += 1
+        return data_x, data_y
+
 
     def load_predict(self, session, data):
-        pass
+        n = len(data)
+        size = n * (n - 1) // 2
+        pairings = []
+        result = np.zeros((size, self.input_features), dtype=np.float32)
+        counter = 0
+        for i in range(n - 1):
+            for j in range(i + 1, n):
+                if random.random() < 0.5:
+                    p1 = data[i]
+                    p2 = data[j]
+                else:
+                    p1 = data[j]
+                    p2 = data[i]
+
+                result[counter, :INDIVIDUAL_FEATURES] = load_individual_predict(session, **p1)
+                result[counter, INDIVIDUAL_FEATURES:] = load_individual_predict(session, **p2)
+
+                counter += 1
+                pairings.append((p1["number"], p2["number"]))
+        return pairings, result

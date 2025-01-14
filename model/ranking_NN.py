@@ -14,14 +14,18 @@ class RankingNN(_Model):
         super().__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(self.dataloader.input_features, 32),
+            nn.Linear(self.dataloader.input_features, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(64,32),
             nn.BatchNorm1d(32),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(0.3),
             nn.Linear(32,16),
             nn.BatchNorm1d(16),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(0.3),
             nn.Linear(16,1),
         )
 
@@ -36,11 +40,11 @@ class RankingNN(_Model):
         return ParticipationRankingLoader()
 
     def optimizer(self):
-        return torch.optim.Adam(self.parameters(), lr=0.03, weight_decay=0.01)
+        return torch.optim.Adam(self.parameters(), lr=0.01, weight_decay=0.01)
 
     @staticmethod
     def criterion():
-        return nn.MSELoss()
+        return nn.L1Loss()
 
     def accuracy(self, output, target):
         return (torch.round(output) == target).float().mean().item()

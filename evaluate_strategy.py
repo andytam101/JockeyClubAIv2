@@ -35,7 +35,7 @@ def is_unordered(target, bet):
 
 def is_ordered(target, bet):
     # for forecast, tierce and quartet
-    bet_str = ",".join(bet)
+    bet_str = ",".join(list(map(str, bet)))
     return target == bet_str or target == "-"
 
 
@@ -230,24 +230,24 @@ def main():
     warnings.filterwarnings("ignore", category=FutureWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    model_dir = "trained_models/winner_nn_opponents_epoch_10000"
+    model_dir = "trained_models/ranking_nn_long_epoch_1000"
     strategies = [
         # RandomWinnerStrategy(),
-        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0, count=1),
+        # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0, count=1),
 
         # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0.9, count=1),
-        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.0, count=1),
-        HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.1, count=1),
         # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=1.3, count=1),
 
         # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=0.9, count=1),
-        HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.0, count=1),
-        HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.1, count=1),
         # # HighPWinnerProgressiveStrategy(model_dir=model_dir, threshold=1.3, count=1),
         #
         # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=0.9, count=1),
-        HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.0, count=1),
-        HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.1, count=1),
+        # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.0, count=1),
+        # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.1, count=1),
         # HighPWinnerProportionStrategy(model_dir=model_dir, threshold=1.3, count=1),
 
         # HighEVWinnerStrategy(model_dir=model_dir),
