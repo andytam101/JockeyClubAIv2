@@ -1,10 +1,57 @@
+from setuptools.command.editable_wheel import editable_wheel
+
 from database import Horse, Participation, Race
 from datetime import datetime, time
 from utils import utils
 import numpy as np
 from datetime import timedelta
 
-INDIVIDUAL_FEATURES = 55
+
+def calculate_normalized_rankings(p):
+    number_of_participants = get_number_of_participants(p.race)
+    ranking = get_ranking_from_participation(p)
+    return ranking / number_of_participants
+
+
+def get_number_of_participants(race):
+    n = len(utils.remove_unranked_participants(race.participations))
+    return n
+
+
+def get_all_participants(race):
+    return utils.remove_unranked_participants(race.participations)
+
+
+def calculate_speed(p):
+    return time_to_number_of_seconds(p.finish_time) / p.race.distance
+
+
+def filter_relevant_participations(ps, start_date=None, end_date=None):
+    ps = utils.remove_unranked_participants(ps)
+    if start_date and end_date:
+        ps = list(filter(lambda x: start_date <= x.race.date < end_date, ps))
+    elif start_date:
+        ps = list(filter(lambda x: start_date <= x.race.date, ps))
+    elif end_date:
+        ps = list(filter(lambda x: x.race.date < end_date, ps))
+    ps.sort(key=lambda x: x.race.date, reverse=True)
+    return ps
+
+
+def mean_std_latest(xs):
+    if len(xs) == 0:
+        return 0, 0, 0
+    return np.mean(xs), np.std(xs), xs[0]
+
+
+def calculate_running_average(xs, length):
+    result = []
+    for i in range(length, len(xs) + 1):
+        result.append(np.mean(xs[i - length:i]))
+    return result
+
+def calculate_gradient(xs):
+    return np.diff(xs)
 
 
 def get_training_participations(session, start_date=None, end_date=None):
@@ -70,8 +117,14 @@ def convert_race_class(x):
         return int(words[1])
     elif words[0] == "Group":
         return english_to_int(words[1]) / 10
-    elif words[0] == "Griffin":
+    elif words[0] == "Hong" and words[1] == "Kong" and words[2] == "Group":
+        return english_to_int(words[3]) / 10
+    else:
         return 6
+    # elif words[0] == "Griffin" or x == "4 Year Olds":
+    #     return 6
+    # else:
+    #     return 0
 
 
 def english_to_int(num):
@@ -309,101 +362,109 @@ def load_individual_participation(session, p: Participation):
     return result
 
 
-def load_individual_predict(session, **kwargs):
-    """Load one prediction entry"""
-    horse_id = kwargs["horse_id"]
-    jockey_id = kwargs["jockey_id"]
-    number = kwargs["number"]
-    date = kwargs["date"]
-    rating = kwargs["rating"]
-    trainer_id = kwargs["trainer_id"]
-    gear_weight = kwargs["gear_weight"]
-    horse_weight = kwargs["horse_weight"]
-    lane = kwargs["lane"]
-    race_class = kwargs["race_class"]  # convert_race_class should have already been called
-    distance = kwargs["distance"]
-    total_bet = kwargs["total_bet"]
-    number_of_horses = kwargs["number_of_horses"]
+# def load_individual_predict(session, **kwargs):
+#     """Load one prediction entry"""
+#     horse_id = kwargs["horse_id"]
+#     jockey_id = kwargs["jockey_id"]
+#     number = kwargs["number"]
+#     date = kwargs["date"]
+#     rating = kwargs["rating"]
+#     trainer_id = kwargs["trainer_id"]
+#     gear_weight = kwargs["gear_weight"]
+#     horse_weight = kwargs["horse_weight"]
+#     lane = kwargs["lane"]
+#     race_class = kwargs["race_class"]  # convert_race_class should have already been called
+#     distance = kwargs["distance"]
+#     total_bet = kwargs["total_bet"]
+#     number_of_horses = kwargs["number_of_horses"]
+#
+#     entry = np.zeros(INDIVIDUAL_FEATURES, dtype=np.float32)
+#     entry[0] = lane
+#     entry[1] = number
+#     entry[2] = gear_weight
+#     entry[3] = rating if rating is not None else 25
+#     entry[4] = horse_weight
+#     entry[5] = race_class
+#     entry[6] = distance
+#     entry[7] = total_bet
+#     entry[8] = number_of_horses
+#
+#     horse_ps, jockey_ps, trainer_ps = get_relevant_participations(session,
+#                                                                   date, 90, horse_id, jockey_id, trainer_id)
+#
+#     if len(horse_ps) > 0:
+#         latest_horse_p = max(horse_ps, key=lambda x: x.race.date).race.date
+#     else:
+#         latest_horse_p = date
+#
+#     if len(jockey_ps) > 0:
+#         latest_jockey_p = max(jockey_ps, key=lambda x: x.race.date).race.date
+#     else:
+#         latest_jockey_p = date
+#
+#     num_days_horse = (date - latest_horse_p).days
+#     num_days_jockey = (date - latest_jockey_p).days
+#
+#     entry[9] = num_days_horse
+#     entry[10] = num_days_jockey
+#
+#     horse_ps_data = ([len(horse_ps)]
+#                      + get_group_speed(horse_ps)
+#                      + get_group_ranking(horse_ps)
+#                      + get_group_rating(horse_ps)
+#                      + get_group_horse_weights(horse_ps)
+#                      + get_group_win_odds(horse_ps)
+#                      + [get_group_top_ratio(horse_ps, 1)]
+#                      + [get_group_top_ratio(horse_ps, 2)]
+#                      + [get_group_top_ratio(horse_ps, 3)]
+#                      + [get_group_top_ratio(horse_ps, 4)]
+#                      + [get_latest_speed(horse_ps)]
+#                      + [get_latest_rating(horse_ps)]
+#                      + [get_latest_horse_weight(horse_ps)])
+#
+#     jockey_ps_data = ([len(jockey_ps)]
+#                       + get_group_speed(jockey_ps)
+#                       + get_group_ranking(jockey_ps)
+#                       + get_group_rating(jockey_ps)
+#                       + get_group_gear_weights(jockey_ps)
+#                       + get_group_win_odds(jockey_ps)
+#                       + [get_group_top_ratio(jockey_ps, 1)]
+#                       + [get_group_top_ratio(jockey_ps, 2)]
+#                       + [get_group_top_ratio(jockey_ps, 3)]
+#                       + [get_group_top_ratio(jockey_ps, 4)]
+#                       + [get_latest_speed(jockey_ps)]
+#                       + [get_latest_rating(jockey_ps)]
+#                       + [get_latest_gear_weight(jockey_ps)])
+#
+#     trainer_speed_mean, _ = get_group_speed(trainer_ps)
+#     trainer_ranking_median, _ = get_group_ranking(trainer_ps)
+#     trainer_win_odds_mean, _ = get_group_win_odds(trainer_ps)
+#     trainer_top_1_ratio = get_group_top_ratio(trainer_ps, 1)
+#     trainer_top_2_ratio = get_group_top_ratio(trainer_ps, 2)
+#     trainer_top_3_ratio = get_group_top_ratio(trainer_ps, 3)
+#     trainer_top_4_ratio = get_group_top_ratio(trainer_ps, 4)
+#
+#     trainer_ps_data = [
+#         len(trainer_ps),
+#         trainer_speed_mean,
+#         trainer_ranking_median,
+#         trainer_win_odds_mean,
+#         trainer_top_1_ratio,
+#         trainer_top_2_ratio,
+#         trainer_top_3_ratio,
+#         trainer_top_4_ratio
+#     ]
+#
+#     entry[11:INDIVIDUAL_FEATURES] = np.array(
+#         horse_ps_data + jockey_ps_data + trainer_ps_data
+#     )
+#
+#     return np.nan_to_num(entry)
 
-    entry = np.zeros(INDIVIDUAL_FEATURES, dtype=np.float32)
-    entry[0] = lane
-    entry[1] = number
-    entry[2] = gear_weight
-    entry[3] = rating if rating is not None else 25
-    entry[4] = horse_weight
-    entry[5] = race_class
-    entry[6] = distance
-    entry[7] = total_bet
-    entry[8] = number_of_horses
 
-    horse_ps, jockey_ps, trainer_ps = get_relevant_participations(session,
-                                                                  date, 90, horse_id, jockey_id, trainer_id)
-
-    if len(horse_ps) > 0:
-        latest_horse_p = max(horse_ps, key=lambda x: x.race.date).race.date
+def encode_condition(condition):
+    ordering = ['HEAVY', 'WET SLOW', 'WET FAST', 'SOFT', 'YIELDING TO SOFT', 'GOOD TO YIELDING', 'GOOD', 'GOOD TO FIRM', 'FAST']
+    if condition in ordering:
+        return ordering.index(condition) + 1
     else:
-        latest_horse_p = date
-
-    if len(jockey_ps) > 0:
-        latest_jockey_p = max(jockey_ps, key=lambda x: x.race.date).race.date
-    else:
-        latest_jockey_p = date
-
-    num_days_horse = (date - latest_horse_p).days
-    num_days_jockey = (date - latest_jockey_p).days
-
-    entry[9] = num_days_horse
-    entry[10] = num_days_jockey
-
-    horse_ps_data = ([len(horse_ps)]
-                     + get_group_speed(horse_ps)
-                     + get_group_ranking(horse_ps)
-                     + get_group_rating(horse_ps)
-                     + get_group_horse_weights(horse_ps)
-                     + get_group_win_odds(horse_ps)
-                     + [get_group_top_ratio(horse_ps, 1)]
-                     + [get_group_top_ratio(horse_ps, 2)]
-                     + [get_group_top_ratio(horse_ps, 3)]
-                     + [get_group_top_ratio(horse_ps, 4)]
-                     + [get_latest_speed(horse_ps)]
-                     + [get_latest_rating(horse_ps)]
-                     + [get_latest_horse_weight(horse_ps)])
-
-    jockey_ps_data = ([len(jockey_ps)]
-                      + get_group_speed(jockey_ps)
-                      + get_group_ranking(jockey_ps)
-                      + get_group_rating(jockey_ps)
-                      + get_group_gear_weights(jockey_ps)
-                      + get_group_win_odds(jockey_ps)
-                      + [get_group_top_ratio(jockey_ps, 1)]
-                      + [get_group_top_ratio(jockey_ps, 2)]
-                      + [get_group_top_ratio(jockey_ps, 3)]
-                      + [get_group_top_ratio(jockey_ps, 4)]
-                      + [get_latest_speed(jockey_ps)]
-                      + [get_latest_rating(jockey_ps)]
-                      + [get_latest_gear_weight(jockey_ps)])
-
-    trainer_speed_mean, _ = get_group_speed(trainer_ps)
-    trainer_ranking_median, _ = get_group_ranking(trainer_ps)
-    trainer_win_odds_mean, _ = get_group_win_odds(trainer_ps)
-    trainer_top_1_ratio = get_group_top_ratio(trainer_ps, 1)
-    trainer_top_2_ratio = get_group_top_ratio(trainer_ps, 2)
-    trainer_top_3_ratio = get_group_top_ratio(trainer_ps, 3)
-    trainer_top_4_ratio = get_group_top_ratio(trainer_ps, 4)
-
-    trainer_ps_data = [
-        len(trainer_ps),
-        trainer_speed_mean,
-        trainer_ranking_median,
-        trainer_win_odds_mean,
-        trainer_top_1_ratio,
-        trainer_top_2_ratio,
-        trainer_top_3_ratio,
-        trainer_top_4_ratio
-    ]
-
-    entry[11:INDIVIDUAL_FEATURES] = np.array(
-        horse_ps_data + jockey_ps_data + trainer_ps_data
-    )
-
-    return np.nan_to_num(entry)
+        return 0

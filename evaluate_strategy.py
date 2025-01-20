@@ -9,6 +9,10 @@ from strategy.HighPWinnerProportionStrategy import HighPWinnerProportionStrategy
 from strategy.HighPWinnerProgressiveStrategy import HighPWinnerProgressiveStrategy
 from strategy.RandomWinnerStrategy import RandomWinnerStrategy
 from strategy.PevWinnerStrategy import PevWinnerStrategy
+from strategy.RankingStrategy import RankingStrategy
+from strategy.PairwiseStrategy import PairwiseStrategy
+
+from bet import Bet
 
 import matplotlib.pyplot as plt
 
@@ -30,22 +34,22 @@ def is_solo(target, bet):
 def is_unordered(target, bet):
     # for quinella, quinella place, trio, first 4
     target_set = set(map(int, target.split(",")))
-    return set(bet) == target_set or target == "-"
+    return set(bet) == target_set
 
 
 def is_ordered(target, bet):
     # for forecast, tierce and quartet
     bet_str = ",".join(list(map(str, bet)))
-    return target == bet_str or target == "-"
+    return target == bet_str
 
 
 def calculate_payout(validate_func, winning, bet_combination, amount):
     target_combination = winning.combination
     win_odds = winning.amount / 10
     if validate_func(target_combination, bet_combination):
-        return float(win_odds) * amount - amount
+        return float(win_odds) * amount - amount, win_odds
     else:
-        return -amount
+        return -amount, win_odds
 
 
 def calculate_one_bet_payout(
@@ -55,6 +59,9 @@ def calculate_one_bet_payout(
         amount,
         pool: str,
 ):
+    if amount <= 0:
+        return 0
+
     payouts = session.query(Winnings).filter(Winnings.race_id == race_id).all()
     get_one = lambda x: list(filter(lambda y: y.pool == x, payouts))[0]
     get_all = lambda x: list(filter(lambda y: y.pool == x, payouts))
@@ -64,12 +71,32 @@ def calculate_one_bet_payout(
         winning = get_one(WIN)
         return calculate_payout(is_solo, winning, bet_combination, amount)
     elif pool == PLACE:
-        raise NotImplementedError()
+        winnings = get_all(PLACE)
+        max_profit = -amount
+        winning_odds = None
+        for winning in winnings:
+            if winning.combination == "-":
+                continue
+            payout, odds = calculate_payout(is_solo, winning, bet_combination, amount)
+            if payout > max_profit:
+                winning_odds = odds
+                max_profit = payout
+        return max_profit, winning_odds
     elif pool == QUINELLA:
         winning = get_one(QUINELLA)
         return calculate_payout(is_unordered, winning, bet_combination, amount)
     elif pool == Q_PLACE:
-        raise NotImplementedError()
+        winnings = get_all(Q_PLACE)
+        max_profit = -amount
+        winning_odds = None
+        for winning in winnings:
+            if winning.combination == "-":
+                continue
+            payout, odds = calculate_payout(is_unordered, winning, bet_combination, amount)
+            if payout > max_profit:
+                winning_odds = odds
+                max_profit = payout
+        return max_profit, winning_odds
     elif pool == FORECAST:
         winning = get_one(FORECAST)
         return calculate_payout(is_ordered, winning, bet_combination, amount)
@@ -146,51 +173,51 @@ def count_bets(bets):
 
 def evaluate_strategy(strategy, start_date, end_date=datetime.today().date()):
     session = get_session()
-    all_races = session.query(Race).filter(Race.date >= start_date).filter(Race.date <= end_date).all()
+    all_races = session.query(Race).filter(Race.date >= start_date).filter(Race.date < end_date).all()
 
-    number_won = 0
-    number_bets = 0
-    number_of_races = 0
+    bets_won = generate_empty_pool_dictionary(0)
+    total_bets = generate_empty_pool_dictionary(0)
+    profit = generate_empty_pool_dictionary(0)
+    winning_odds = generate_empty_pool_dictionary([])
 
     balance_history = [strategy.init_balance]
 
     done = False
-    for race in tqdm(all_races, desc=f"{strategy}"):
+    for race in tqdm(all_races[:1], desc=f"{strategy}"):
         data = simulate_upcoming_race(race)
         data.sort(key=lambda x: x["number"])
-        bet = strategy.bet(session, data)
+        bets: list[Bet] = strategy.bet(session, data)
 
-        race_amount_bet = 0
-        for pool in bet:
-            for combination in bet[pool]:
-                amount = bet[pool][combination]
-                if amount <= 0:
-                    continue
-                payout = calculate_one_bet_payout(session, race.id, combination, amount, pool)
-                if payout > 0:
-                   number_won += 1
-                race_amount_bet += amount
-                number_bets += 1
-                strategy.update_balance(payout)
-                if strategy.balance <= 0:
-                    done = True
-                    break
-            if done:
+        for bet in bets:
+            pool = bet.pool
+            bet_combination = bet.combination
+            amount = bet.amount
+
+            payout, odds = calculate_one_bet_payout(session, race.id, bet_combination, amount, pool)
+            if payout > 0:
+                bets_won[pool] += 1
+                winning_odds[pool].append(float(odds))
+            profit[pool] += payout
+            total_bets[pool] += 1
+            strategy.update_balance(payout)
+
+            if strategy.balance <= 0:
+                done = True
                 break
-        if race_amount_bet > 0:
-            number_of_races += 1
         balance_history.append(strategy.balance)
         if done:
-            break
+             break
 
     session.close()
 
+    print(winning_odds)
     return {
-        "total_number_of_races": len(all_races),
-        "number_of_races": number_of_races,
-        "number_of_bets": number_bets,
-        "number_won": number_won,
-        "history": balance_history,
+        "bets_won": bets_won,
+        "total_bets": total_bets,
+        "profit": profit,
+        "balance_history": balance_history,
+        "number_of_races": len(all_races),
+        "winning_odds": winning_odds,
     }
 
 def display_results(strategy, result):
@@ -230,8 +257,10 @@ def main():
     warnings.filterwarnings("ignore", category=FutureWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    model_dir = "trained_models/ranking_nn_long_epoch_1000"
+    model_dir = "trained_models/ranking_nn_long_epoch_10000"
     strategies = [
+        RankingStrategy(model_dir=model_dir, init_balance=10000),
+        # PairwiseStrategy(model_dir=model_dir, init_balance=10000),
         # RandomWinnerStrategy(),
         # HighPWinnerAbsoluteStrategy(model_dir=model_dir, threshold=0, count=1),
 
@@ -259,12 +288,33 @@ def main():
     results = []
 
     for strategy in strategies:
-        this_r = evaluate_strategy(strategy, start_date=datetime(2024, 9, 1))
+        this_r = evaluate_strategy(strategy, start_date=datetime(2024, 9, 1).date(), end_date=datetime.today().date())
         print()
         results.append(this_r)
 
-    for i in range(len(results)):
-        display_results(strategies[i], results[i])
+    for result in results:
+        bets_won = result["bets_won"]
+        total_bets = result["total_bets"]
+        profit = result["profit"]
+        balance_history = result["balance_history"]
+        number_of_races = result["number_of_races"]
+        winning_odds = result["winning_odds"]
+
+        for pool in ALL_POOLS:
+            if total_bets[pool] == 0:
+                continue
+            accuracy = bets_won[pool] / total_bets[pool] * 100
+            print(pool.center(50, "="))
+            print(f"Profit: {profit[pool]:.2f}")
+            print(f"Number of bets won: {bets_won[pool]}")
+            print(f"Total number of bets: {total_bets[pool]}")
+            print(f"Accuracy: {accuracy:.2f}%")
+            print()
+
+        print(f"Number of races {number_of_races}")
+        print(balance_history)
+        print(winning_odds[FORECAST])
+
 
 if __name__ == '__main__':
     main()

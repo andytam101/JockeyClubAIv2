@@ -68,7 +68,7 @@ class DataCollector:
 
     def get_participations(self, url):
         participations = self.scraper.scrape_participation_by_race(url)
-        for p in participations:
+        for idx, p in enumerate(participations):
             # guaranteed to have horses
             horse_id = p["horse_id"]
             horse_url = p["horse_url"].lower()
@@ -93,7 +93,12 @@ class DataCollector:
                     })
 
             p["jockey_id"] = jockey_id
-            p["rating"] = self.scraper.scrape_participation_rating(horse_url, p["race_id"])
+            try:
+                p["rating"] = self.scraper.scrape_participation_rating(horse_url, p["race_id"])
+            except Exception as e:
+                p["rating"] = None
+                e_str = str(e).split("\n")[0]
+                self.logger.error(f"Error reading rating of participation {idx + 1} at url = {url}. Error: {e_str}")
 
             self.store.store_participation(p)
 
@@ -238,9 +243,9 @@ def main():
         else:
             print("Invalid item")
     elif instruction in {"races"}:
-        data_collector.collect_all_races_from_date(start_date=datetime(2020, 9, 1),
-                                                   end_date=datetime(2022, 9, 1).date())
-        data_collector.collect_all_participations(start_date=datetime(2020, 9, 1).date(), end_date=datetime(2022, 9, 1).date())
+        data_collector.collect_all_races_from_date(start_date=datetime(2015, 9, 1),
+                                                   end_date=datetime(2017, 9, 1).date())
+        data_collector.collect_all_participations(start_date=datetime(2015, 9, 1).date(), end_date=datetime(2017, 9, 1).date())
 
 if __name__ == "__main__":
     main()

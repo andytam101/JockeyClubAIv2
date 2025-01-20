@@ -32,6 +32,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
+        driver.implicitly_wait(3)
         try:
             driver.find_element(By.CLASS_NAME, "top_races")
         except NoSuchElementException:
@@ -41,6 +42,7 @@ class Scraper:
     def scrape_all_horses_urls(self, url: str) -> list[str]:
         driver = self.driver
         driver.get(url)
+        driver.implicitly_wait(3)
         table = driver.find_elements(By.CLASS_NAME, "bigborder")[1]
         return list(map(lambda x: x.get_attribute("href").lower(), table.find_elements(By.TAG_NAME, "a")))
 
@@ -56,9 +58,11 @@ class Scraper:
 
         assert url.islower()
         driver = self.driver
+        driver.implicitly_wait(3)
 
         try:
             driver.get(url)
+            driver.implicitly_wait(3)
             profile = driver.find_element(By.CLASS_NAME, "horseProfile")
             last = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")[-1]
             if last.rstrip(")") in {"Retired", "Deregistered"}:
@@ -76,6 +80,7 @@ class Scraper:
             # read chinese name
             chi_url = url.replace("english", "chinese")
             driver.get(chi_url)
+            driver.implicitly_wait(3)
             profile = driver.find_element(By.CLASS_NAME, "horseProfile")
             name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
             name_chi = name_id[0]
@@ -102,6 +107,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
+        driver.implicitly_wait(3)
         result = {}
         profile = driver.find_element(By.CLASS_NAME, "horseProfile")
 
@@ -161,6 +167,7 @@ class Scraper:
 
         result = {}
         driver.get(url)
+        driver.implicitly_wait(3)
         profile = driver.find_element(By.CLASS_NAME, "horseProfile")
 
         name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
@@ -212,6 +219,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
+        driver.implicitly_wait(3)
         top_races = driver.find_element(By.CLASS_NAME, "top_races")
         return len(top_races.find_element(By.TAG_NAME, "tbody").find_element(By.TAG_NAME, "tr").
                    find_elements(By.TAG_NAME, "td")) - 2
@@ -226,6 +234,7 @@ class Scraper:
         assert url.islower()
         driver = self.driver
         driver.get(url)
+        driver.implicitly_wait(3)
 
         try:
             result = {
@@ -325,6 +334,7 @@ class Scraper:
         # constant info across different horses: race ID and season
         result = []
         driver.get(url)
+        driver.implicitly_wait(3)
 
         try:
             race = driver.find_element(By.CLASS_NAME, "race_tab")
@@ -376,8 +386,8 @@ class Scraper:
     def scrape_participation_rating(self, url: str, race_id):
         assert url.islower()
         driver = self.driver
-
         driver.get(url)
+        driver.implicitly_wait(3)
         race_table = driver.find_element(By.CLASS_NAME, "bigborder")
         entries = race_table.find_elements(By.TAG_NAME, "tr")
         for entry in entries:
@@ -401,6 +411,7 @@ class Scraper:
         assert url.islower()
         driver = self.driver
         driver.get(url)
+        driver.implicitly_wait(3)
 
         result = {
             "url": url
@@ -434,6 +445,8 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
+        driver.implicitly_wait(3)
+
         data = []
 
         body = driver.find_element(By.TAG_NAME, "body")
@@ -547,8 +560,8 @@ class Scraper:
         assert "fct" in url
 
         driver = self.driver
-        driver.implicitly_wait(2)
         driver.get(url)
+        driver.implicitly_wait(2)
 
         table = driver.find_element(By.CLASS_NAME, "iwn-odds-slide-container")
 
@@ -586,8 +599,8 @@ class Scraper:
         # ensure url is a quinella / quinella place url
         assert "wpq" in url
         driver = self.driver
-        driver.implicitly_wait(2)
         driver.get(url)
+        driver.implicitly_wait(2)
         tables = driver.find_element(By.CLASS_NAME, "qin-odds-slide-container")
 
         qin_odds = []

@@ -47,7 +47,7 @@ class ModelTrainer:
         cv_idx = int(m * (1 - cv_size))
         return x[:cv_idx], y[:cv_idx], x[cv_idx:], y[cv_idx:]
 
-    def train_model(self, data_dir, cv_size=0.2, epochs=10000, batch_size=10000000):
+    def train_model(self, data_dir, cv_size=0.2, epochs=10000, batch_size=2048):
         x = np.load(os.path.join(data_dir, 'data_x.npy'))
         y = np.load(os.path.join(data_dir, 'data_y.npy'))   # ranking only
 

@@ -38,7 +38,7 @@ class PairwiseBinary(_Model):
         return PairwiseLoader()
 
     def optimizer(self):
-        return torch.optim.SGD(self.parameters(), lr=0.001, weight_decay=0.01, momentum=0.9)
+        return torch.optim.SGD(self.parameters(), lr=0.001, weight_decay=0.01, momentum=0.3)
 
     @staticmethod
     def criterion():
@@ -81,14 +81,14 @@ class PairwiseBinary(_Model):
 
         return {
             WIN: first,
-            PLACE: [first[0], second[0], third[0]],
-            FORECAST: (first[0], second[0],),
-            QUINELLA: (first[0], second[0],),
-            Q_PLACE: [(first[0], second[0]), (first[0], third[0]), (second[0], third[0])],
-            TRIO: (first[0], second[0], third[0]),
-            TIERCE: (first[0], second[0], third[0]),
-            FIRST_4: (first[0], second[0], third[0], fourth[0]),
-            QUARTET: (first[0], second[0], third[0], fourth[0]),
+            # PLACE: [first[0], second[0], third[0]],
+            # FORECAST: (first[0], second[0],),
+            # QUINELLA: (first[0], second[0],),
+            # Q_PLACE: [(first[0], second[0]), (first[0], third[0]), (second[0], third[0])],
+            # TRIO: (first[0], second[0], third[0]),
+            # TIERCE: (first[0], second[0], third[0]),
+            # FIRST_4: (first[0], second[0], third[0], fourth[0]),
+            # QUARTET: (first[0], second[0], third[0], fourth[0]),
 
             "ALL": dict(corresponding),
         }

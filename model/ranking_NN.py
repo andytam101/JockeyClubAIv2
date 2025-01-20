@@ -74,11 +74,17 @@ class RankingNN(_Model):
         pass
 
     def format_predictions_for_race(self, combinations, predictions):
-        predictions = predictions.squeeze(1).tolist()
-        corresponding = list(zip(combinations, predictions))
-        winner_horse = min(corresponding, key=lambda x: x[1])
+        ranking = predictions.squeeze(1).tolist()
+        corresponding = list(zip(combinations, ranking))
+        corresponding.sort(key=lambda x: x[1])
+
+        first = corresponding[0]
+        second = corresponding[1]
+        third = corresponding[2]
+        fourth = corresponding[3]
 
         return {
-            WIN: winner_horse,
+            WIN: first,
+            # FORECAST: (first[0], second[0]),
             "ALL": dict(corresponding),
         }

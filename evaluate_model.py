@@ -91,6 +91,9 @@ def main():
             if winning_comb is None:
                 continue
 
+            if pool not in {PLACE, Q_PLACE} and winning_comb.combination == "-":
+                continue
+
             if pool == WIN:
                 if is_solo(winning_comb.combination, guesses[pool][0]):
                     correct_dict[WIN] += 1
@@ -98,6 +101,8 @@ def main():
             elif pool == PLACE:
                 for guess in guesses[pool]:
                     for comb in winning_comb:
+                        if comb.combination == "-":
+                            continue
                         if is_solo(comb.combination, guess):
                             correct_dict[PLACE] += 1
                             break
@@ -113,18 +118,20 @@ def main():
             elif pool == Q_PLACE:
                 for guess in guesses[pool]:
                     for comb in winning_comb:
+                        if comb.combination == "-":
+                            continue
                         if is_unordered(comb.combination, guess):
                             correct_dict[Q_PLACE] += 1
                             break
                     total_dict[Q_PLACE] += 1
             elif pool == TRIO:
                 if is_unordered(winning_comb.combination, guesses[pool]):
-                    correct_dict[TIERCE] += 1
-                total_dict[TIERCE] += 1
-            elif pool == TIERCE:
-                if is_ordered(winning_comb.combination, guesses[pool]):
                     correct_dict[TRIO] += 1
                 total_dict[TRIO] += 1
+            elif pool == TIERCE:
+                if is_ordered(winning_comb.combination, guesses[pool]):
+                    correct_dict[TIERCE] += 1
+                total_dict[TIERCE] += 1
             elif pool == FIRST_4:
                 if is_unordered(winning_comb.combination, guesses[pool]):
                     correct_dict[FIRST_4] += 1

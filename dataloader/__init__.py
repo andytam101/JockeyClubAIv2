@@ -1,10 +1,12 @@
-from dataloader.pairwise_loader import PairwiseLoader
-from dataloader.participation_ranking_loader import ParticipationRankingLoader
+from .pairwise_loader import PairwiseLoader
+from .participation_ranking_loader import ParticipationRankingLoader
+from .participation_timing_loader import ParticipationTimingLoader
 import numpy as np
 
 dataloader_dict = {
-    "PRLoader": ParticipationRankingLoader,
-    "PairLoader": PairwiseLoader
+    "PRLoader": ParticipationRankingLoader,    # pointwise model
+    "PairLoader": PairwiseLoader,              # pairwise model
+    "PTLoader": ParticipationTimingLoader,     # pointwise model
 }
 
 
