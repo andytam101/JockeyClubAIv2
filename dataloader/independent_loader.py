@@ -801,7 +801,7 @@ def get_jockey_trainer_features(p):
     race_date = p.race.date
     ps = filter_relevant_participations(ps, end_date=race_date)
     ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, jockey=True)
+    ps = get_combo_ps(p, ps, trainer=True)
 
     general_group_data = get_general_group_data(p, ps_days)
     speed_data = load_speed_data(ps)
