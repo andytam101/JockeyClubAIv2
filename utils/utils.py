@@ -40,7 +40,7 @@ def get_track_width(location, track):
     if location == "Sha Tin":
         return SHA_TIN_TRACK_WIDTH[letter]
     elif location == "Happy Valley":
-        pass
+        return HV_TRACK_WIDTH[letter]
     else:
         raise Exception(f"Unknown location: {location}")
 

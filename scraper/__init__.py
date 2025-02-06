@@ -32,7 +32,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         try:
             driver.find_element(By.CLASS_NAME, "top_races")
         except NoSuchElementException:
@@ -42,7 +42,7 @@ class Scraper:
     def scrape_all_horses_urls(self, url: str) -> list[str]:
         driver = self.driver
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         table = driver.find_elements(By.CLASS_NAME, "bigborder")[1]
         return list(map(lambda x: x.get_attribute("href").lower(), table.find_elements(By.TAG_NAME, "a")))
 
@@ -58,11 +58,11 @@ class Scraper:
 
         assert url.islower()
         driver = self.driver
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
 
         try:
             driver.get(url)
-            driver.implicitly_wait(3)
+            driver.implicitly_wait(1)
             profile = driver.find_element(By.CLASS_NAME, "horseProfile")
             last = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")[-1]
             if last.rstrip(")") in {"Retired", "Deregistered"}:
@@ -80,7 +80,7 @@ class Scraper:
             # read chinese name
             chi_url = url.replace("english", "chinese")
             driver.get(chi_url)
-            driver.implicitly_wait(3)
+            driver.implicitly_wait(1)
             profile = driver.find_element(By.CLASS_NAME, "horseProfile")
             name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
             name_chi = name_id[0]
@@ -107,7 +107,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         result = {}
         profile = driver.find_element(By.CLASS_NAME, "horseProfile")
 
@@ -167,7 +167,7 @@ class Scraper:
 
         result = {}
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         profile = driver.find_element(By.CLASS_NAME, "horseProfile")
 
         name_id = profile.find_element(By.CLASS_NAME, "title_text").text.split(" (")
@@ -219,7 +219,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         top_races = driver.find_element(By.CLASS_NAME, "top_races")
         return len(top_races.find_element(By.TAG_NAME, "tbody").find_element(By.TAG_NAME, "tr").
                    find_elements(By.TAG_NAME, "td")) - 2
@@ -234,7 +234,7 @@ class Scraper:
         assert url.islower()
         driver = self.driver
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
 
         try:
             result = {
@@ -334,7 +334,7 @@ class Scraper:
         # constant info across different horses: race ID and season
         result = []
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
 
         try:
             race = driver.find_element(By.CLASS_NAME, "race_tab")
@@ -387,7 +387,7 @@ class Scraper:
         assert url.islower()
         driver = self.driver
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
         race_table = driver.find_element(By.CLASS_NAME, "bigborder")
         entries = race_table.find_elements(By.TAG_NAME, "tr")
         for entry in entries:
@@ -411,7 +411,7 @@ class Scraper:
         assert url.islower()
         driver = self.driver
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
 
         result = {
             "url": url
@@ -445,7 +445,7 @@ class Scraper:
         driver = self.driver
 
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.implicitly_wait(1)
 
         data = []
 

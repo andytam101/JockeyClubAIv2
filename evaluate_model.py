@@ -9,6 +9,11 @@ from datetime import datetime
 from argparse import ArgumentParser
 from tqdm import tqdm
 
+import numpy as np
+
+from dataloader.utils import get_number_of_participants
+
+import os
 import logging
 
 
@@ -16,8 +21,9 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("model", help="model name")
     parser.add_argument("model_dir")
-    parser.add_argument("-s", "--start", default="2023/01/01")
-    parser.add_argument("-e", "--end", default=datetime.today().strftime("%Y/%m/%d"))
+    parser.add_argument("-r", "--races_dir", required=True)
+    # parser.add_argument("-s", "--start", default="2023/01/01")
+    # parser.add_argument("-e", "--end", default=datetime.today().strftime("%Y/%m/%d"))
     return parser.parse_args()
 
 
@@ -38,6 +44,13 @@ def get_correct_combination_of_race(race, pool=WIN):
             return None
 
 
+def read_races(races_dir):
+    data_x_path = os.path.join(races_dir, "data_x.npz")
+    data = np.load(data_x_path)
+
+    return data
+
+
 def main():
     args = parse_args()
 
@@ -47,14 +60,13 @@ def main():
     init_engine()
     model_name = args.model
     model_dir = args.model_dir
-    start_date = datetime.strptime(args.start, "%Y/%m/%d")
-    end_date = datetime.strptime(args.end, "%Y/%m/%d")
+    races_dir = args.races_dir
 
     model = load_model(model_name)
 
     predictor = ModelPrediction(model, model_dir)
     session = get_session()
-    all_races = get_all_races(session, start_date, end_date)
+    all_races = read_races(races_dir)
 
     correct_dict = {
         WIN: 0,
@@ -79,15 +91,20 @@ def main():
         FIRST_4: 0,
         QUARTET: 0
     }
-    for race in tqdm(all_races, desc="Evaluating races..."):
-        data = simulate_upcoming_race(race)
-        guesses = predictor.guess_outcome_of_race(session, data)
+
+    for race_id in tqdm(all_races, desc="Evaluating races..."):
+        data = all_races[race_id]
+        race = session.query(Race).filter(Race.id == race_id).one()
+
+        if get_number_of_participants(race) < 4:
+            continue
+
+        guesses = predictor.guess_outcome_of_race(data)
 
         for pool in guesses:
             if pool == "ALL":
                 continue
             winning_comb = get_correct_combination_of_race(race, pool)
-
             if winning_comb is None:
                 continue
 

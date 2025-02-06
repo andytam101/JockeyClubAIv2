@@ -15,6 +15,7 @@ def parse_args():
     parser.add_argument("-m", "--model_dir", required=True)
     parser.add_argument("-e", "--epochs", type=int, default=10000)
     parser.add_argument("-cv", "--cv_size", type=float, default=0.2)
+    parser.add_argument("-b", "--batch_size", type=int, default=64)
 
     return parser.parse_args()
 
@@ -23,7 +24,7 @@ def main():
     args = parse_args()
     model = load_model(args.model)
     model_trainer = ModelTrainer(model)
-    train_hist, cv_hist = model_trainer.train_model(args.data_dir, epochs=args.epochs, cv_size=args.cv_size)
+    train_hist, cv_hist = model_trainer.train_model(args.data_dir, epochs=args.epochs, cv_size=args.cv_size, batch_size=args.batch_size)
     model_trainer.save(args.model_dir)
 
     train_cost, train_acc = train_hist[-1]

@@ -134,12 +134,15 @@ def simulate_upcoming_race(race):
             # TODO: add variance to win odds to simulate uncertainty in betting
             "win_odds": utils.randomize_odds(float(p.win_odds)),
 
+            "location": race.location,
+            "course": race.course,
+            "condition": race.condition,
             "date": race.date,
             "race_class": dataloader.convert_race_class(race.race_class),
             "distance": race.distance,
             "total_bet": race.total_bet,
             "trainer_id": p.horse.trainer_id,
-            "number_of_horses": len(ps),
+            "number_of_participants": len(ps),
             "opponents": []
         }
 
