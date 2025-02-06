@@ -19,6 +19,7 @@ test.*
 *.pth
 
 # loaded data files
+loaded_data/
 *.npy
 *.npz
 
