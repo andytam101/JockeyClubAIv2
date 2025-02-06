@@ -50,8 +50,8 @@ class Loader(ABC):
 
         x[:] = np.nan_to_num((x - train_mean) / train_std)
 
-        combined_x = np.zeros((0, self.input_features))
     def _save(self, output_dir, data_x, data_y):
+        combined_x = np.zeros((0, self.input_features))
         combined_y = np.zeros((0, self.output_features))
 
         os.makedirs(output_dir, exist_ok=True)
