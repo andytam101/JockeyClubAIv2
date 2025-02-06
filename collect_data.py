@@ -122,7 +122,7 @@ class DataCollector:
             self.get_horse(horse)
 
     def collect_all_races_from_date(self, start_date, end_date=datetime.now().date()):
-        start_date = start_date.date()
+        start_date = start_date
         time_diff = end_date - start_date
         all_urls = []
         if self.race_url_found:
@@ -222,7 +222,8 @@ def main():
     data_collector = DataCollector(Scraper(), Fetch(), Store(), race_url_save_path=args.url_path,
                                    race_url_found=args.url_found)
     instruction = args.instruction.lower()
-    start_date = datetime.strptime(args.start_date, "%Y/%m/%d")
+    start_date = datetime.strptime(args.start_date, "%Y/%m/%d").date()
+    end_date = datetime.strptime(args.end_date, "%Y/%m/%d").date() if args.end_date is not None else datetime.now().date()
     if instruction in {"build", "b"}:
         data_collector.collect_all_data(start_date)
     elif instruction in {"update", "u"}:
@@ -243,9 +244,9 @@ def main():
         else:
             print("Invalid item")
     elif instruction in {"races"}:
-        data_collector.collect_all_races_from_date(start_date=datetime(2015, 9, 1),
-                                                   end_date=datetime(2017, 9, 1).date())
-        data_collector.collect_all_participations(start_date=datetime(2015, 9, 1).date(), end_date=datetime(2017, 9, 1).date())
+        # data_collector.collect_all_races_from_date(start_date=start_date,
+        #                                            end_date=end_date)
+        data_collector.collect_all_participations(start_date=start_date, end_date=end_date)
 
 if __name__ == "__main__":
     main()
