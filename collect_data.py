@@ -244,8 +244,8 @@ def main():
         else:
             print("Invalid item")
     elif instruction in {"races"}:
-        # data_collector.collect_all_races_from_date(start_date=start_date,
-        #                                            end_date=end_date)
+        data_collector.collect_all_races_from_date(start_date=start_date,
+                                                   end_date=end_date)
         data_collector.collect_all_participations(start_date=start_date, end_date=end_date)
 
 if __name__ == "__main__":
