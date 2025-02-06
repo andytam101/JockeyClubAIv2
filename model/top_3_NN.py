@@ -7,7 +7,7 @@ import os
 from tabulate import tabulate
 from wcwidth import wcswidth
 
-from dataloader import ParticipationRankingLoader
+from dataloader import PointwiseLoader
 from ._model import _Model
 from utils.utils import pad_chinese
 from utils.pools import *
@@ -35,7 +35,7 @@ class Top3NN(_Model):
 
     @staticmethod
     def _dataloader():
-        return ParticipationRankingLoader()
+        return PointwiseLoader()
 
     def optimizer(self):
         return optim.Adam(self.parameters(), lr=0.003)

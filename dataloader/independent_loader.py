@@ -3,6 +3,8 @@ from .utils import *
 import numpy as np
 from datetime import datetime, timedelta
 
+from database import Horse, Jockey, Participation, Race
+
 # data sizes
 PARTICIPATION_FEATURES = 6
 HORSE_FEATURES = 48
@@ -33,31 +35,50 @@ INDEPENDENT_FEATURES = (
         HORSE_CONDITION_FEATURES +
         HORSE_JOCKEY_CONDITION_FEATURES +
         JOCKER_TRAINER_FEATURES
-    )
+    )  # total = 366
 
 
-def get_combo_ps(p, ps, jockey=False, trainer=False, condition=False, distance=False, track=False):
-    jockey_obj = p.jockey
-    trainer_obj = p.horse.trainer
+def get_combo_ps(p, ps, session, prediction, jockey=False, trainer=False, condition=False, distance=False, track=False):
+    if not prediction:
+        jockey_obj = p.jockey
+        trainer_obj = p.horse.trainer
 
-    if jockey:
-        ps = list(filter(lambda x: x.jockey_id == jockey_obj.id, ps))
-    if trainer:
-        ps = list(filter(lambda x: x.horse.trainer_id == trainer_obj.id, ps))
-    if condition:
-        ps = list(filter(lambda x: x.race.condition == p.race.condition, ps))
-    if distance:
-        ps = list(filter(lambda x: x.race.distance == p.race.distance, ps))
-    if track:
-        ps = list(filter(lambda x: x.race.course == p.race.course, ps))
+        if jockey:
+            ps = list(filter(lambda x: x.jockey_id == jockey_obj.id, ps))
+        if trainer:
+            ps = list(filter(lambda x: x.horse.trainer_id == trainer_obj.id, ps))
+        if condition:
+            ps = list(filter(lambda x: x.race.condition == p.race.condition, ps))
+        if distance:
+            ps = list(filter(lambda x: x.race.distance == p.race.distance, ps))
+        if track:
+            ps = list(filter(lambda x: x.race.course == p.race.course, ps))
+    else:
+        if jockey:
+            ps = list(filter(lambda x: x.jockey_id == p["jockey_id"], ps))
+        if trainer:
+            horse_obj = session.query(Horse).filter(Horse.id == p["horse_id"]).one()
+            trainer_obj = horse_obj.trainer
+            ps = list(filter(lambda x: x.horse.trainer_id == trainer_obj.id, ps))
+        if condition:
+            ps = list(filter(lambda x: x.race.condition == p["condition"], ps))
+        if distance:
+            ps = list(filter(lambda x: x.race.distance == p["distance"], ps))
+        if track:
+            ps = list(filter(lambda x: x.race.course == p["course"], ps))
 
     return ps
 
 
-def get_general_group_data(p, ps):
+def get_general_group_data(p, ps, prediction=False):
+    if not prediction:
+        race_date = p.race.date
+    else:
+        race_date = p["date"]
+
     if len(ps) > 0:
         most_recent = ps[0]
-        diff = p.race.date - most_recent.race.date
+        diff = race_date - most_recent.race.date
     else:
         diff = timedelta(days=COUNT_DAYS_BACKWARD)
 
@@ -223,23 +244,104 @@ def get_ratio_data(ps):
 def load_participation_features(p):
     # length = 6
     number_of_participants = get_number_of_participants(p.race)
-    return [p.rating, p.number, p.lane, p.lane / number_of_participants, p.horse_weight, p.gear_weight]
+    return [25 if p.rating is None else p.rating, p.number, p.lane, p.lane / number_of_participants, p.horse_weight, p.gear_weight]
 
 
 def load_predict_participation_features(p, number_of_participants):
     return [p["rating"], p["number"], p["lane"], p["lane"] / number_of_participants, p["horse_weight"], p["gear_weight"]]
 
 
-def load_horse_features(p):
-    # length = 48
+def get_horse_ps_from_participation(p):
     horse = p.horse
     ps = horse.participations
     race_date = p.race.date
     ps = filter_relevant_participations(ps, end_date=race_date)
     ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    return ps, ps_days
+
+
+def get_jockey_ps_from_participation(p):
+    jockey = p.jockey
+    ps = jockey.participations
+    race_date = p.race.date
+    ps = filter_relevant_participations(ps, end_date=race_date)
+    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    return ps, ps_days
+
+
+def get_trainer_ps_from_horse(horse):
+    trainer = horse.trainer
+    horses = trainer.horses
+    result = []
+    for horse in horses:
+        result += horse.participations
+    return result
+
+
+def get_trainer_ps_from_participation(p):
+    horse = p.horse
+    ps = get_trainer_ps_from_horse(horse)
+    race_date = p.race.date
+    ps = filter_relevant_participations(ps, end_date=race_date)
+    ps_days = filter_relevant_participations(ps, end_date=race_date,
+                                             start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    return ps, ps_days
+
+
+def get_horse_ps_from_dictionary(session, p):
+    horse_id = p["horse_id"]
+    horse_obj = session.query(Horse).filter(Horse.id == horse_id).one_or_none()
+
+    if horse_obj is None:
+        # TODO: consider problem when horse is not in database
+        return [], []
+
+    ps = horse_obj.participations
+    race_date = p["date"]
+    ps = filter_relevant_participations(ps, end_date=race_date)
+    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    return  ps, ps_days
+
+
+def get_jockey_ps_from_dictionary(session, p):
+    jockey_id = p["jockey_id"]
+    jockey_obj = session.query(Jockey).filter(Jockey.id == jockey_id).one_or_none()
+
+    if jockey_obj is None:
+        # TODO: consider problem when horse is not in database
+        return [], []
+
+    ps = jockey_obj.participations
+    race_date = p["date"]
+    ps = filter_relevant_participations(ps, end_date=race_date)
+    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+
+    return ps, ps_days
+
+
+def get_trainer_ps_from_dictionary(session, p: dict):
+    horse_id = p["horse_id"]
+    horse = session.query(Horse).filter(Horse.id == horse_id).one_or_none()
+    if horse is None:
+        return [], []
+
+    ps = get_trainer_ps_from_horse(horse)
+    race_date = p["date"]
+    ps = filter_relevant_participations(ps, end_date=race_date)
+    ps_days = filter_relevant_participations(ps, end_date=race_date,
+                                             start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    return ps, ps_days
+
+
+def load_horse_features(p, session, prediction):
+    # length = 48
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
     ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     horse_weight_data = load_horse_weight_data(ps)
     ranking_data = load_ranking_data(ps)
@@ -300,16 +402,15 @@ def load_horse_features(p):
     ]
 
 
-def load_jockey_features(p):
+def load_jockey_features(p, session, prediction):
     # length = 30
-    jockey = p.jockey
-    ps = jockey.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    if not prediction:
+        ps, ps_days = get_jockey_ps_from_participation(p)
+    else:
+        ps, ps_days = get_jockey_ps_from_dictionary(session, p)
     ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     win_odds_data = load_win_odds_data(ps)
@@ -350,20 +451,15 @@ def load_jockey_features(p):
     ]
 
 
-def load_trainer_features(p):
+def load_trainer_features(p, session, prediction):
     # length = 19
-    trainer = p.horse.trainer
-    all_horses = trainer.horses
-    ps = []
-    for h in all_horses:
-        ps += h.participations
-
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
+    if not prediction:
+        ps, ps_days = get_trainer_ps_from_participation(p)
+    else:
+        ps, ps_days = get_trainer_ps_from_dictionary(session, p)
     ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     win_odds_data = load_win_odds_data(ps)
     ranking_data = load_ranking_data(ps)
@@ -393,15 +489,15 @@ def load_trainer_features(p):
     ]
 
 
-def get_horse_jockey_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, jockey=True)
+def get_horse_jockey_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, jockey=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     rating_data = load_rating_data(ps)
@@ -449,15 +545,15 @@ def get_horse_jockey_features(p):
     ]
 
 
-def get_horse_distance_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, distance=True)
+def get_horse_distance_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, distance=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     rating_data = load_rating_data(ps)
@@ -502,15 +598,16 @@ def get_horse_distance_features(p):
     ]
 
 
-def get_jockey_distance_features(p):
-    jockey = p.jockey
-    ps = jockey.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, distance=True)
+def get_jockey_distance_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_jockey_ps_from_participation(p)
+    else:
+        ps, ps_days = get_jockey_ps_from_dictionary(session, p)
 
-    general_group_data = get_general_group_data(p, ps_days)
+    ps = get_combo_ps(p, ps, session, prediction, distance=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
+
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     win_odds_data = load_win_odds_data(ps)
@@ -546,15 +643,16 @@ def get_jockey_distance_features(p):
     ]
 
 
-def get_horse_jockey_distance_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, jockey=True, distance=True)
+def get_horse_jockey_distance_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
 
-    general_group_data = get_general_group_data(p, ps_days)
+    ps = get_combo_ps(p, ps, session, prediction, distance=True, jockey=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
+
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     win_odds_data = load_win_odds_data(ps)
@@ -594,15 +692,15 @@ def get_horse_jockey_distance_features(p):
     ]
 
 
-def get_horse_track_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, track=True)
+def get_horse_track_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, track=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     rating_data = load_rating_data(ps)
@@ -647,15 +745,15 @@ def get_horse_track_features(p):
     ]
 
 
-def get_horse_jockey_track_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, jockey=True, track=True)
+def get_horse_jockey_track_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, jockey=True, track=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     win_odds_data = load_win_odds_data(ps)
@@ -694,15 +792,16 @@ def get_horse_jockey_track_features(p):
         top_ratio_data["top_4_ratio"],
     ]
 
-def get_horse_condition_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, track=True)
 
-    general_group_data = get_general_group_data(p, ps_days)
+def get_horse_condition_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, track=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
+
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     rating_data = load_rating_data(ps)
@@ -747,15 +846,15 @@ def get_horse_condition_features(p):
     ]
 
 
-def get_horse_jockey_condition_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, jockey=True, condition=True)
+def get_horse_jockey_condition_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, jockey=True, condition=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     win_odds_data = load_win_odds_data(ps)
@@ -795,15 +894,15 @@ def get_horse_jockey_condition_features(p):
     ]
 
 
-def get_jockey_trainer_features(p):
-    horse = p.horse
-    ps = horse.participations
-    race_date = p.race.date
-    ps = filter_relevant_participations(ps, end_date=race_date)
-    ps_days = filter_relevant_participations(ps, end_date=race_date, start_date=race_date - timedelta(days=COUNT_DAYS_BACKWARD))
-    ps = get_combo_ps(p, ps, trainer=True)
+def get_jockey_trainer_features(p, session, prediction):
+    if not prediction:
+        ps, ps_days = get_horse_ps_from_participation(p)
+    else:
+        ps, ps_days = get_horse_ps_from_dictionary(session, p)
+    ps = get_combo_ps(p, ps, session, prediction, trainer=True)
+    ps = ps[:COUNT_RACES_BACKWARD]
 
-    general_group_data = get_general_group_data(p, ps_days)
+    general_group_data = get_general_group_data(p, ps_days, prediction)
     speed_data = load_speed_data(ps)
     ranking_data = load_ranking_data(ps)
     rating_data = load_rating_data(ps)
@@ -829,20 +928,25 @@ def get_jockey_trainer_features(p):
     ]
 
 
-def load_one_independent_participation(p):
-    p_features = load_participation_features(p)
-    horse_features = load_horse_features(p)
-    jockey_features = load_jockey_features(p)
-    trainer_features = load_trainer_features(p)
-    h_j_features = get_horse_jockey_features(p)
-    h_d_features = get_horse_distance_features(p)
-    j_d_features = get_jockey_distance_features(p)
-    h_j_d_features = get_horse_jockey_distance_features(p)
-    h_t_features = get_horse_track_features(p)
-    h_j_t_features = get_horse_jockey_track_features(p)
-    h_c_features = get_horse_condition_features(p)
-    h_j_c_features = get_horse_jockey_condition_features(p)
-    j_t_features = get_jockey_trainer_features(p)
+def load_one_independent_participation(p, session, prediction, number_of_participants=None):
+    assert not prediction or number_of_participants is not None
+
+    if not prediction:
+        p_features = load_participation_features(p)
+    else:
+        p_features = load_predict_participation_features(p, number_of_participants)
+    horse_features = load_horse_features(p, session, prediction)
+    jockey_features = load_jockey_features(p, session, prediction)
+    trainer_features = load_trainer_features(p, session, prediction)
+    h_j_features = get_horse_jockey_features(p, session, prediction)
+    h_d_features = get_horse_distance_features(p, session, prediction)
+    j_d_features = get_jockey_distance_features(p, session, prediction)
+    h_j_d_features = get_horse_jockey_distance_features(p, session, prediction)
+    h_t_features = get_horse_track_features(p, session, prediction)
+    h_j_t_features = get_horse_jockey_track_features(p, session, prediction)
+    h_c_features = get_horse_condition_features(p, session, prediction)
+    h_j_c_features = get_horse_jockey_condition_features(p, session, prediction)
+    j_t_features = get_jockey_trainer_features(p, session, prediction)
 
     result = np.array(
         p_features +
@@ -862,9 +966,3 @@ def load_one_independent_participation(p):
 
     assert result.shape[0] == INDEPENDENT_FEATURES
     return result
-
-
-def load_one_predict_independent_participation(session, p, number_of_participants):
-    p_features = load_predict_participation_features(p, number_of_participants)
-
-

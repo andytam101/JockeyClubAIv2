@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
 
-from dataloader import ParticipationTimingLoader
+from dataloader import PointwiseLoader
 from ._model import _Model
+
+from utils.pools import *
+
 
 class TimingNN(_Model):
     def __init__(self):
@@ -27,7 +30,7 @@ class TimingNN(_Model):
 
     @staticmethod
     def _dataloader():
-        return ParticipationTimingLoader()
+        return PointwiseLoader()
 
     def optimizer(self):
         return torch.optim.SGD(self.parameters(), lr=1e-5, weight_decay=0.01, momentum=0.8)
@@ -44,10 +47,20 @@ class TimingNN(_Model):
         return ((target - accuracy_threshold < output) & (output < target + accuracy_threshold)).float().mean().item()
 
     def process_y(self, y):
-        return y
+        return y[:, 2].reshape(-1, 1)
 
     def display_results(self, **kwargs):
         raise NotImplementedError
 
     def format_predictions_for_race(self, combinations, predictions):
-        raise NotImplementedError
+        combinations = list(map(int, combinations))
+        predictions = predictions.tolist()
+
+        corresponding = list(zip(combinations, predictions))
+        corresponding.sort(key=lambda x: x[1])
+
+        first = corresponding[0]
+
+        return {
+            WIN: first
+        }

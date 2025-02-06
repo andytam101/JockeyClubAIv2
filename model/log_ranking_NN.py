@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 from ._model import _Model
-from dataloader import ParticipationRankingLoader
+from dataloader import PointwiseLoader
 
 from utils.pools import *
 
@@ -33,7 +33,7 @@ class LogRankingNN(_Model):
 
     @staticmethod
     def _dataloader():
-        return ParticipationRankingLoader()
+        return PointwiseLoader()
 
     def optimizer(self):
         return torch.optim.SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=0)

@@ -47,7 +47,7 @@ class ModelTrainer:
         cv_idx = int(m * (1 - cv_size))
         return x[:cv_idx], y[:cv_idx], x[cv_idx:], y[cv_idx:]
 
-    def train_model(self, data_dir, cv_size=0.2, epochs=10000, batch_size=2048):
+    def train_model(self, data_dir, cv_size=0.2, epochs=10000, batch_size=64):
         x = np.load(os.path.join(data_dir, 'data_x.npy'))
         y = np.load(os.path.join(data_dir, 'data_y.npy'))   # ranking only
 
@@ -72,6 +72,7 @@ class ModelTrainer:
         optimizer = self.optimizer
         criterion = self.model.criterion()
         acc_func = self.model.accuracy
+        print(f"Training model: {self.model} for {epochs} epochs")
 
         # show initial loss
         self.model.eval()
@@ -91,7 +92,6 @@ class ModelTrainer:
 
         batch_numbers = math.ceil(train_x.size()[0] / batch_size)
 
-        print(f"Training model: {self.model} for {epochs} epochs")
         for epoch in range(epochs):
             for i in range(batch_numbers):
                 # set model to train mode
@@ -121,7 +121,7 @@ class ModelTrainer:
             train_hist.append((loss.item(), train_accuracy))
             cv_hist.append((cv_loss.item(), cv_accuracy))
 
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 10 == 0:
                 print(f"Epoch {epoch + 1}: train loss = {loss}, cv loss = {cv_loss}")
 
         return train_hist, cv_hist

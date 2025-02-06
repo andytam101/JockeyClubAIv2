@@ -1,31 +1,15 @@
-import numpy as np
-from setuptools.namespaces import flatten
-from sympy.core.numbers import all_close
-
 from .loader import Loader
 from .utils import *
-from .independent_loader import *
+from .independent_loader import INDEPENDENT_FEATURES, load_one_independent_participation
 
-from database import Participation, Race
-import utils.utils as utils
+from database import Race
 
 from tqdm import tqdm
 
 RACE_FEATURES = 9
 
 
-class PointwiseLoader(Loader):
-    def __init__(self):
-        super().__init__()
-
-    @property
-    def input_features(self):
-        return INDEPENDENT_FEATURES + RACE_FEATURES
-
-    @property
-    def output_features(self):
-        return 4
-
+class LambdaRankLoader(Loader):
     @staticmethod
     def convert_race_to_dict(race):
         return {
@@ -45,7 +29,7 @@ class PointwiseLoader(Loader):
         # race as a dictionary
         race_class = race["race_class"]
         distance = race["distance"]
-        location = race["location"] == "Sha Tin"   # (i.e. 0 for Happy Valley, 1 for Sha Tin)
+        location = race["location"] == "Sha Tin"  # (i.e. 0 for Happy Valley, 1 for Sha Tin)
         width = utils.get_track_width(race["location"], race["course"])
         condition = race["condition"]
         total_bet = race["total_bet"]
@@ -67,6 +51,14 @@ class PointwiseLoader(Loader):
             race_upper_limit,
             race_lower_limit,
         ], dtype=np.float32)
+
+    @property
+    def input_features(self):
+        return INDEPENDENT_FEATURES + RACE_FEATURES
+
+    @property
+    def output_features(self):
+        return 1
 
     def _load_from_db(self, session, start_date=None, end_date=None):
         races = get_races_between_dates(session, start_date, end_date)
@@ -90,50 +82,14 @@ class PointwiseLoader(Loader):
 
             for i, p in enumerate(ps):
                 this_x[i, :RACE_FEATURES] = self.load_race_features(race_dict)
-                this_x[i, RACE_FEATURES:] = load_one_independent_participation(p, session, False)
-
-                # flag = 0
-                # opponents = np.zeros((p_count - 1, INDEPENDENT_FEATURES), dtype=np.float32)
-                # for j, opponent in enumerate(ps):
-                #     if opponent == p:
-                #         flag = 1
-                #         continue
-                #     opponents[j - flag] = load_one_independent_participation(opponent, session, False)
-                # this_x[i, RACE_FEATURES + INDEPENDENT_FEATURES:] = np.mean(opponents, axis=0)
+                this_x[i, RACE_FEATURES:RACE_FEATURES + INDEPENDENT_FEATURES] = load_one_independent_participation(p, session, False)
 
                 this_y[i, 0] = get_ranking_from_participation(p)
-                this_y[i, 1] = get_ranking_from_participation(p) / p_count
-                this_y[i, 2] = time_to_number_of_seconds(p.finish_time)
-                this_y[i, 3] = p.win_odds
 
             all_x[race.id] = this_x
             all_y[race.id] = this_y
 
         return all_x, all_y
 
-
     def load_predict(self, session, data):
-        m = len(data)
-        numbers = []
-        result = np.zeros((m, self.input_features), dtype=np.float32)
-
-        for idx in range(m):
-            p_entry = data[idx]
-            race_features = self.load_race_features(p_entry)
-            result[idx, :RACE_FEATURES] = race_features
-            self_features = load_one_independent_participation(p_entry, session, True, p_entry["number_of_participants"])
-            result[idx, RACE_FEATURES:INDEPENDENT_FEATURES + RACE_FEATURES] = self_features
-
-            opponent_matrix = np.zeros((m - 1, INDEPENDENT_FEATURES), dtype=np.float32)
-            flag = 0
-            for idx2 in range(m):
-                if idx2 == idx:
-                    flag = 1
-                    continue
-                opponent_entry = load_one_independent_participation(p_entry, session, True, p_entry["number_of_participants"])
-                opponent_matrix[idx - flag] = opponent_entry
-
-            result[idx, INDEPENDENT_FEATURES + RACE_FEATURES:] = np.mean(opponent_matrix, axis=0)
-            numbers.append(p_entry["number"])
-
-        return numbers, result
+        pass

@@ -1,17 +1,23 @@
 import numpy as np
 import os
 from abc import ABC, abstractmethod
+from tqdm import tqdm
 
 class Loader(ABC):
     def load_train(self, session, output_dir, start_date=None, end_date=None):
         # start_date and end_date decides range of races to include
-        x, y = self._load_from_db(session, start_date, end_date)
+        xs, ys = self._load_from_db(session, start_date, end_date)
         session.close()
-        self._save(output_dir, x, y)
+        self._save(output_dir, xs, ys)
 
     @property
     @abstractmethod
     def input_features(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def output_features(self):
         raise NotImplementedError()
 
     @abstractmethod
@@ -44,10 +50,23 @@ class Loader(ABC):
 
         x[:] = np.nan_to_num((x - train_mean) / train_std)
 
-    @staticmethod
-    def _save(output_dir, data_x, data_y):
+        combined_x = np.zeros((0, self.input_features))
+    def _save(self, output_dir, data_x, data_y):
+        combined_y = np.zeros((0, self.output_features))
+
         os.makedirs(output_dir, exist_ok=True)
-        data_x_file = os.path.join(output_dir, 'data_x.npy')
-        data_y_file = os.path.join(output_dir, 'data_y.npy')
-        np.save(data_x_file, data_x)
-        np.save(data_y_file, data_y)
+        data_x_file = os.path.join(output_dir, 'data_x.npz')
+        data_y_file = os.path.join(output_dir, 'data_y.npz')
+        np.savez(data_x_file, **data_x)
+        np.savez(data_y_file, **data_y)
+
+        all_race_id = list(data_x.keys())
+        for race_id in tqdm(all_race_id, desc="Concatenating data"):
+            race_x = data_x[race_id]
+            race_y = data_y[race_id]
+
+            combined_x = np.concatenate((combined_x, race_x))
+            combined_y = np.concatenate((combined_y, race_y))
+
+        np.save(os.path.join(output_dir, 'data_x.npy'), combined_x)
+        np.save(os.path.join(output_dir, 'data_y.npy'), combined_y)

@@ -1,12 +1,12 @@
+from .lambda_rank_loader import LambdaRankLoader
 from .pairwise_loader import PairwiseLoader
-from .participation_ranking_loader import ParticipationRankingLoader
-from .participation_timing_loader import ParticipationTimingLoader
+from .pointwise_loader import PointwiseLoader
 import numpy as np
 
 dataloader_dict = {
-    "PRLoader": ParticipationRankingLoader,    # pointwise model
-    "PairLoader": PairwiseLoader,              # pairwise model
-    "PTLoader": ParticipationTimingLoader,     # pointwise model
+    "PWLoader": PointwiseLoader,     # pointwise model
+    "PairLoader": PairwiseLoader,    # pairwise model
+    "LambdaRank": LambdaRankLoader
 }
 
 

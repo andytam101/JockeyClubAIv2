@@ -32,8 +32,13 @@ class ModelPrediction:
         formatted_predictions = self.model.reformat_predictions(predictions)
         return combinations, formatted_predictions
 
-    def guess_outcome_of_race(self, session, data):
-        combinations, predictions = self.predict(session, data)
+    def guess_outcome_of_race(self, data):
+        combinations = data[:, 10].tolist()
+        params = self.model.load_normalization(self.model_dir)
+        self.dataloader.normalize(data, **params)
+        data = torch.tensor(data, dtype=torch.float32, device=device)
+        self.model.eval()
+        predictions = self.model(data)
         return self.model.format_predictions_for_race(combinations, predictions)
 
     def display_results(self, **kwargs):

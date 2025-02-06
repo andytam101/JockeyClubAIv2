@@ -7,7 +7,7 @@ from ._model import _Model
 from utils.pools import *
 
 
-class RankingNN(_Model):
+class NRankingNN(_Model):
     def __init__(self):
         super().__init__()
         self.accuracy_threshold = 0.1
@@ -26,6 +26,7 @@ class RankingNN(_Model):
             nn.BatchNorm1d(32),
             nn.Dropout(0.4),
             nn.Linear(32, 1),
+            nn.Sigmoid()
         )
 
     @staticmethod
@@ -33,21 +34,21 @@ class RankingNN(_Model):
         return PointwiseLoader()
 
     def optimizer(self):
-        return torch.optim.SGD(self.parameters(), lr=1e-4, weight_decay=0.01, momentum=0.9)
+        return torch.optim.SGD(self.parameters(), lr=1e-3, weight_decay=0.001, momentum=0.9)
 
     def forward(self, x):
         return self.model(x)
 
     @staticmethod
     def criterion():
-        return nn.L1Loss()
+        return nn.MSELoss()
 
     def accuracy(self, output, target):
         accuracy_threshold = self.accuracy_threshold
         return ((target - accuracy_threshold < output) & (output < target + accuracy_threshold)).float().mean().item()
 
     def process_y(self, y):
-        return y[:, 0].reshape(-1, 1)
+        return y[:, 1].reshape(-1, 1)
 
     def display_results(self, **kwargs):
         raise NotImplementedError
