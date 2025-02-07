@@ -1,32 +1,16 @@
 import torch
-from torch import nn
+import torch.nn as nn
+import torch.optim as optim
+
 from abc import ABC, abstractmethod
-
-from dataloader.loader import Loader as DataLoader
-from utils.config import device
-
-import numpy as np
-import os
 
 
 class _Model(nn.Module, ABC):
-    def __init__(self):
-        super(_Model, self).__init__()
-        self.dataloader: DataLoader = self._dataloader()
+    def __init__(self, *args, **kwargs):
+        super().__init__()
 
-    def predict(self, data):
-        x = self.dataloader.load_predict(data)
-        self.dataloader.normalize(x, **self.normalization)
-        x = torch.tensor(x, device=device)
-        predictions = self(x)
-        return self.reformat_predictions(predictions)
-
-    @staticmethod
     @abstractmethod
-    def _dataloader():
-        """
-        Returns basic unloaded type of dataloader required by each model
-        """
+    def forward(self, x):
         raise NotImplementedError
 
     @abstractmethod
@@ -34,48 +18,15 @@ class _Model(nn.Module, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, x):
+    def criterion(self):
         raise NotImplementedError
 
-    @staticmethod
-    @abstractmethod
-    def criterion():
-        raise NotImplementedError
+    def format_y(self, y):
+        return y
 
     @abstractmethod
-    def accuracy(self, output, target):
-        raise NotImplementedError
-
-    @staticmethod
-    def reformat_predictions(predictions):
-        return predictions
-
-    def save_normalization(self, model_dir, **kwargs):
-        mean_path = os.path.join(model_dir, "train_mean.npy")
-        std_path = os.path.join(model_dir, "train_std.npy")
-
-        np.save(mean_path, kwargs["train_mean"])
-        np.save(std_path, kwargs["train_std"])
-
-    def load_normalization(self, model_dir):
-        mean_path = os.path.join(model_dir, "train_mean.npy")
-        std_path = os.path.join(model_dir, "train_std.npy")
-
-        train_mean = np.load(mean_path)
-        train_std = np.load(std_path)
-        return {
-            "train_mean": train_mean,
-            "train_std": train_std
-        }
-
-    @abstractmethod
-    def process_y(self, y):
-        raise NotImplementedError
-
-    @abstractmethod
-    def display_results(self, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def format_predictions_for_race(self, combinations, predictions):
+    def perform_bet(self, horse_nums, x, **kwargs):
+        """
+        Only used for evaluating model. Will not be used for actual prediction.
+        """
         raise NotImplementedError

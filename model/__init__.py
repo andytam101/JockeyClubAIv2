@@ -1,27 +1,18 @@
-from model.log_ranking_NN import LogRankingNN
-from model.nranking_NN import NRankingNN
-from model.pairwise_binary import PairwiseBinary
-from model.pairwise_ranking import PairwiseRanking
-from model.ranking_NN import RankingNN
-from model.timing_NN import TimingNN
-from model.top_3_NN import Top3NN
-from model.top_3_LR import Top3LR
-from model.winner_NN import WinnerNN
-from utils import config
+from .winner_binary import WinnerBinary
+from .place_binary import PlaceBinary
+from .timing import Timing
+from .win_odds import WinOdds
 
-model_dict = {
-    "Top3LR": Top3LR,
-    "Top3NN": Top3NN,
-    "WinnerNN": WinnerNN,
-    "RankingNN": RankingNN,
-    "LRankingNN": LogRankingNN,
-    "PairBinary": PairwiseBinary,
-    "PairRanking": PairwiseRanking,
-    "TimingNN": TimingNN,
-    "NRankingNN": NRankingNN,
-}
+import utils.config as config
 
 
-def load_model(model_name):
-    model = model_dict[model_name]
-    return model().to(config.device)
+def load_model(model_name, model_config):
+    models_mapping = {
+        "WinBin": WinnerBinary,
+        "PlaceBin": PlaceBinary,
+        "Timing": Timing,
+        "WinOdds": WinOdds
+    }
+
+    input_size = model_config["input_features"]
+    return models_mapping[model_name](input_size=input_size).to(config.device)

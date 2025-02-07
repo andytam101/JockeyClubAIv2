@@ -26,3 +26,7 @@ loaded_data/
 # miscellaneous data files
 *.txt
 *.csv
+*.json
+
+# old stuff
+old/

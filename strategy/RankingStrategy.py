@@ -1,9 +1,9 @@
-from model import load_model
-from model.model_prediction import ModelPrediction
+from old.model import load_model
+from old.model import ModelPrediction
 from strategy._Strategy import Strategy
 
 from utils.pools import *
-from bet import Bet
+from old.bet import Bet
 
 
 class RankingStrategy(Strategy):

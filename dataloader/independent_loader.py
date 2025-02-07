@@ -6,18 +6,18 @@ from datetime import datetime, timedelta
 from database import Horse, Jockey, Participation, Race
 
 # data sizes
-PARTICIPATION_FEATURES = 6
+PARTICIPATION_FEATURES = 7
 HORSE_FEATURES = 48
 JOCKEY_FEATURES = 30
 TRAINER_FEATURES = 19
-HORSE_JOCKEY_FEATURES = 36
-HORSE_DISTANCE_FEATURES = 33
-JOCKEY_DISTANCE_FEATURES = 25
-HORSE_JOCKEY_DISTANCE_FEATURES = 29
-HORSE_TRACK_FEATURES = 33
-HORSE_JOCKEY_TRACK_FEATURES = 29
-HORSE_CONDITION_FEATURES = 33
-HORSE_JOCKEY_CONDITION_FEATURES = 29
+# HORSE_JOCKEY_FEATURES = 36
+# HORSE_DISTANCE_FEATURES = 33
+# JOCKEY_DISTANCE_FEATURES = 25
+# HORSE_JOCKEY_DISTANCE_FEATURES = 29
+# HORSE_TRACK_FEATURES = 33
+# HORSE_JOCKEY_TRACK_FEATURES = 29
+# HORSE_CONDITION_FEATURES = 33
+# HORSE_JOCKEY_CONDITION_FEATURES = 29
 JOCKER_TRAINER_FEATURES = 16
 
 
@@ -26,14 +26,14 @@ INDEPENDENT_FEATURES = (
         HORSE_FEATURES +
         JOCKEY_FEATURES +
         TRAINER_FEATURES +
-        HORSE_JOCKEY_FEATURES +
-        HORSE_DISTANCE_FEATURES +
-        JOCKEY_DISTANCE_FEATURES +
-        HORSE_JOCKEY_DISTANCE_FEATURES +
-        HORSE_TRACK_FEATURES +
-        HORSE_JOCKEY_TRACK_FEATURES +
-        HORSE_CONDITION_FEATURES +
-        HORSE_JOCKEY_CONDITION_FEATURES +
+        # HORSE_JOCKEY_FEATURES +
+        # HORSE_DISTANCE_FEATURES +
+        # JOCKEY_DISTANCE_FEATURES +
+        # HORSE_JOCKEY_DISTANCE_FEATURES +
+        # HORSE_TRACK_FEATURES +
+        # HORSE_JOCKEY_TRACK_FEATURES +
+        # HORSE_CONDITION_FEATURES +
+        # HORSE_JOCKEY_CONDITION_FEATURES +
         JOCKER_TRAINER_FEATURES
     )  # total = 366
 
@@ -244,7 +244,7 @@ def get_ratio_data(ps):
 def load_participation_features(p):
     # length = 6
     number_of_participants = get_number_of_participants(p.race)
-    return [25 if p.rating is None else p.rating, p.number, p.lane, p.lane / number_of_participants, p.horse_weight, p.gear_weight]
+    return [25 if p.rating is None else p.rating, p.number, p.lane, p.lane / number_of_participants, p.horse_weight, p.gear_weight, p.win_odds]
 
 
 def load_predict_participation_features(p, number_of_participants):
@@ -938,14 +938,14 @@ def load_one_independent_participation(p, session, prediction, number_of_partici
     horse_features = load_horse_features(p, session, prediction)
     jockey_features = load_jockey_features(p, session, prediction)
     trainer_features = load_trainer_features(p, session, prediction)
-    h_j_features = get_horse_jockey_features(p, session, prediction)
-    h_d_features = get_horse_distance_features(p, session, prediction)
-    j_d_features = get_jockey_distance_features(p, session, prediction)
-    h_j_d_features = get_horse_jockey_distance_features(p, session, prediction)
-    h_t_features = get_horse_track_features(p, session, prediction)
-    h_j_t_features = get_horse_jockey_track_features(p, session, prediction)
-    h_c_features = get_horse_condition_features(p, session, prediction)
-    h_j_c_features = get_horse_jockey_condition_features(p, session, prediction)
+    # h_j_features = get_horse_jockey_features(p, session, prediction)
+    # h_d_features = get_horse_distance_features(p, session, prediction)
+    # j_d_features = get_jockey_distance_features(p, session, prediction)
+    # h_j_d_features = get_horse_jockey_distance_features(p, session, prediction)
+    # h_t_features = get_horse_track_features(p, session, prediction)
+    # h_j_t_features = get_horse_jockey_track_features(p, session, prediction)
+    # h_c_features = get_horse_condition_features(p, session, prediction)
+    # h_j_c_features = get_horse_jockey_condition_features(p, session, prediction)
     j_t_features = get_jockey_trainer_features(p, session, prediction)
 
     result = np.array(
@@ -953,14 +953,14 @@ def load_one_independent_participation(p, session, prediction, number_of_partici
         horse_features +
         jockey_features +
         trainer_features +
-        h_j_features +
-        h_d_features +
-        j_d_features +
-        h_j_d_features +
-        h_t_features +
-        h_j_t_features +
-        h_c_features +
-        h_j_c_features +
+        # h_j_features +
+        # h_d_features +
+        # j_d_features +
+        # h_j_d_features +
+        # h_t_features +
+        # h_j_t_features +
+        # h_c_features +
+        # h_j_c_features +
         j_t_features
     , dtype=np.float32)
 

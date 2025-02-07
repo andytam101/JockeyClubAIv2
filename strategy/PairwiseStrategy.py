@@ -1,9 +1,9 @@
 import torch
 
-from model.model_prediction import ModelPrediction
+from old.model import ModelPrediction
 from ._Strategy import Strategy
-from model import load_model
-from bet import Bet
+from old.model import load_model
+from old.bet import Bet
 
 from utils.pools import *
 

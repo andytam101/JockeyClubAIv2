@@ -8,7 +8,9 @@ import random
 import utils.config as config
 
 from dataloader import PointwiseLoader
-from load_data_new import INPUT_FEATURES
+from load_data import INPUT_FEATURES
+
+from database import init_engine, get_session, Winnings
 
 
 class LambdaRankModel(nn.Module):
@@ -16,13 +18,11 @@ class LambdaRankModel(nn.Module):
         super(LambdaRankModel, self).__init__()
         self.model = nn.Sequential(
             nn.Linear(INPUT_FEATURES, 128),
-            nn.BatchNorm1d(128),
+            # nn.BatchNorm1d(64),
             nn.ReLU(),
-            nn.Dropout(0.4),
             nn.Linear(128, 64),
-            nn.BatchNorm1d(64),
+            # nn.BatchNorm1d(16),
             nn.ReLU(),
-            nn.Dropout(0.4),
             nn.Linear(64, 1),
         )
 
@@ -81,12 +81,12 @@ def lambda_rank_loss(p_score, a_score, k=None):
     a_ij = a_score.unsqueeze(1) - a_score.unsqueeze(0)
     sign = (a_ij > 0).float()
 
-    old_ndcg = ndcg(a_score, p_score, k=k)
-    swapped_p = swap_vector_matrix(p_score)
-    new_ndcg =  ndcg(a_score, swapped_p, k=k)
-    delta_ndcg = new_ndcg - old_ndcg
+    # old_ndcg = ndcg(a_score, p_score, k=k)
+    # swapped_p = swap_vector_matrix(p_score)
+    # new_ndcg =  ndcg(a_score, swapped_p, k=k)
+    # delta_ndcg = new_ndcg - old_ndcg
 
-    loss = sign * torch.log(torch.sigmoid(s_ij) + 1e-10) + (1 - sign) * torch.log(1 - torch.sigmoid(s_ij) + 1e-10) * delta_ndcg
+    loss = sign * torch.log(torch.sigmoid(s_ij) + 1e-10) + (1 - sign) * torch.log(1 - torch.sigmoid(s_ij) + 1e-10) * torch.abs(a_ij)
     loss = torch.nan_to_num(loss, nan=0)
 
     equal_mask = (a_ij != 0).float()
@@ -131,7 +131,7 @@ def train_model(data_x, data_y, train_ids, cv_ids, train_mean, train_std, epochs
     train_ids = list(train_ids)
     cv_ids = list(cv_ids)
     criterion = lambda x, y: lambda_rank_loss(x, y, k=k)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, weight_decay=0.0005, momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     model.eval()
     train_loss = 0
@@ -161,7 +161,7 @@ def train_model(data_x, data_y, train_ids, cv_ids, train_mean, train_std, epochs
     train_loss /= train_n
     cv_loss /= cv_n
 
-    print(f"Initial loss: train loss = {train_loss}, cv loss = {cv_loss}")
+    print(f"Initial loss: train loss = {train_loss:.6f}, cv loss = {cv_loss:.6f}")
 
     for epoch in range(epochs):
         model.train()
@@ -198,7 +198,7 @@ def train_model(data_x, data_y, train_ids, cv_ids, train_mean, train_std, epochs
 
         cv_epoch_loss /= cv_n
 
-        print(f"Epoch {epoch + 1}, train loss: {epoch_loss}, cv loss: {cv_epoch_loss}")
+        print(f"Epoch {epoch + 1}, train loss: {epoch_loss:.6f}, cv loss: {cv_epoch_loss:.6f}")
 
     return model, optimizer
 
@@ -212,42 +212,54 @@ def save_model(path, model, optimizer, train_mean, train_std):
 
 
 def main():
-    data_dir = "loaded_data/final_data_2015_2020"
+    data_dir = "old/loaded_data/final_data_v2_2015_2020"
     x_path = os.path.join(data_dir, "data_x.npz")
     y_path = os.path.join(data_dir, "data_y.npz")
     data_x = np.load(x_path)
     data_y = np.load(y_path)
     train_ids, cv_ids, train_mean, train_std = split_data_normalise(data_x, cv_ratio=0.2)
-    model, optimizer = train_model(data_x, data_y, train_ids, cv_ids, train_mean, train_std, epochs=100, k=4)
-    save_model("trained_models/lambda_rank_epoch_10", model, optimizer, train_mean, train_std)
+    model, optimizer = train_model(data_x, data_y, train_ids, cv_ids, train_mean, train_std, epochs=50, k=4)
+    save_model("old/trained_models/lambda_rank_epoch_50", model, optimizer, train_mean, train_std)
 
 
 def evaluate():
-    data_dir = "loaded_data/final_data_2015_2020"
+    data_dir = "old/loaded_data/final_data_2015_2020"
     x_path = os.path.join(data_dir, "data_x.npz")
     y_path = os.path.join(data_dir, "data_y.npz")
     data_x = np.load(x_path)
-    data_y = np.load(y_path)
 
-    model_state_dict = torch.load("trained_models/lambda_rank_epoch_10/model_state_dict.pth")
-    train_mean = torch.load("trained_models/lambda_rank_epoch_10/train_mean.pth")
-    train_std = torch.load("trained_models/lambda_rank_epoch_10/train_std.pth")
+    init_engine()
+    session = get_session()
+
+    model_state_dict = torch.load("old/trained_models/lambda_rank_epoch_100/model_state_dict.pth")
+    train_mean = torch.load("old/trained_models/lambda_rank_epoch_100/train_mean.pth")
+    train_std = torch.load("old/trained_models/lambda_rank_epoch_100/train_std.pth")
     model = LambdaRankModel().to(config.device)
     model.load_state_dict(model_state_dict)
 
+    total = 0
+    correct = 0
     race_ids = list(data_x.keys())
     for race_id in race_ids:
         this_x = torch.tensor(data_x[race_id], dtype=torch.float32, device=config.device)
         horse_num = this_x[:, 10].tolist()
-        print(horse_num)
         this_x = (this_x - train_mean) / train_std
         model.eval()
         output = model(this_x)
         output_flattened = output.view(-1).tolist()
         corresponding = list(zip(horse_num, output_flattened))
-        print(output)
         winner = max(corresponding, key=lambda x: x[1])[0]
-        print(f"Race ID: {race_id}, winner: {winner}")
+
+        winner_num = int(winner)
+        winnings = session.query(Winnings).filter(Winnings.race_id == race_id).filter(Winnings.pool == "WIN").all()
+        actual_winners = list(map(lambda x: int(x.combination), winnings))
+        if winner_num in actual_winners:
+            correct += 1
+        total += 1
+
+    session.close()
+    accuracy = correct / total
+    print(f"Accuracy: {accuracy * 100:.2f}%")
 
 
 if __name__ == "__main__":

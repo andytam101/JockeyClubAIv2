@@ -1,8 +1,8 @@
 import torch
 
-from model.model_prediction import ModelPrediction
+from old.model import ModelPrediction
 from strategy._Strategy import Strategy
-from model import load_model
+from old.model import load_model
 
 from utils.config import device
 
