@@ -13,8 +13,10 @@ import os
 from tqdm import tqdm
 import json
 
+from load_data_2 import is_new_horse
+
 # constants
-RACE_FEATURES = 9
+RACE_FEATURES = 8
 INPUT_FEATURES = RACE_FEATURES + INDEPENDENT_FEATURES
 OUTPUT_FEATURES = 4
 
@@ -24,7 +26,7 @@ def convert_race_to_dict(race):
         "id": race.id,
         "date": race.date,
         "race_class": convert_race_class(race.race_class),
-        "distance": race.distance,
+        # "distance": race.distance,
         "location": race.location,
         "course": race.course,
         "condition": race.condition,
@@ -36,7 +38,7 @@ def convert_race_to_dict(race):
 def load_race_features(race):
     # race as a dictionary
     race_class = race["race_class"]
-    distance = race["distance"]
+    # distance = race["distance"]
     location = race["location"] == "Sha Tin"  # (i.e. 0 for Happy Valley, 1 for Sha Tin)
     width = utils.get_track_width(race["location"], race["course"])
     condition = race["condition"]
@@ -50,7 +52,7 @@ def load_race_features(race):
         race_lower_limit = 0
     return np.array([
         race_class,
-        distance,
+        # distance,
         location,
         encode_condition(condition),
         width,
@@ -77,6 +79,7 @@ def load_from_db(session, start_date=None, end_date=None):
         race = races[idx]
         race_dict = convert_race_to_dict(race)
         ps = utils.remove_unranked_participants(race.participations)
+        ps = [p for p in ps if not is_new_horse(p)]
         p_count = len(ps)
         if p_count <= 4:
             continue
@@ -103,7 +106,7 @@ def load_from_db(session, start_date=None, end_date=None):
         winnings = race.winnings
 
         for pool in ALL_POOLS:
-            this_result[pool] = [x.combination for x in winnings if x.pool == pool]
+            this_result[pool] = [{"combination": x.combination, "amount": float(x.amount)} for x in winnings if x.pool == pool]
         result[race.id] = this_result
 
     metadata["input_features"]  = INPUT_FEATURES

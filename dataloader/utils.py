@@ -27,7 +27,7 @@ def calculate_speed(p):
 
 
 def get_races_between_dates(session, start=None, end=None):
-    races = session.query(Race)
+    races = session.query(Race).filter(Race.distance == 1400)
     if start is not None:
         races = races.filter(Race.date >= start)
     if end is not None:
@@ -126,9 +126,9 @@ def convert_race_class(x):
     if words[0] == "Class":
         return int(words[1])
     elif words[0] == "Group":
-        return english_to_int(words[1]) / 10
+        return 1
     elif words[0] == "Hong" and words[1] == "Kong" and words[2] == "Group":
-        return english_to_int(words[3]) / 10
+        return 1
     else:
         return 6
     # elif words[0] == "Griffin" or x == "4 Year Olds":

@@ -3,6 +3,7 @@ from torch import nn
 import torch.optim as optim
 
 from ._model import _Model
+from utils.pools import *
 
 
 class PlaceBinary(_Model):
@@ -33,5 +34,19 @@ class PlaceBinary(_Model):
     def format_y(self, y):
         return (y[:, 0] <= 3).unsqueeze(1).float()
 
-    def perform_bet(self, x, **kwargs):
-        pass
+    def perform_bet(self, horse_nums, x, **kwargs):
+        k = kwargs.get("k", 0)
+        probabilities = self.forward(x).flatten().tolist()
+
+        corresponding = list(zip(horse_nums, probabilities))
+        corresponding.sort(key=lambda x: x[1], reverse=True)
+
+        first = corresponding[0]
+        second = corresponding[1]
+        fourth = corresponding[3]
+        if first[1] - second[1] > k:
+            return [(WIN, first[0]), (PLACE, first[0])]
+        elif first[1] - fourth[1] > k:
+            return [(PLACE, first[0])]
+        else:
+            return []

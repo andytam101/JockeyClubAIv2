@@ -1,7 +1,10 @@
+import torch
+
 from .winner_binary import WinnerBinary
 from .place_binary import PlaceBinary
 from .timing import Timing
 from .win_odds import WinOdds
+from .ranking_score import RankingScore
 
 import utils.config as config
 
@@ -11,7 +14,8 @@ def load_model(model_name, model_config):
         "WinBin": WinnerBinary,
         "PlaceBin": PlaceBinary,
         "Timing": Timing,
-        "WinOdds": WinOdds
+        "WinOdds": WinOdds,
+        "RScore": RankingScore,
     }
 
     input_size = model_config["input_features"]

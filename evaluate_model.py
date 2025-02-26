@@ -17,6 +17,7 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("model_name", type=str)
     parser.add_argument('model_path', type=str)
+    parser.add_argument('-k', "--k", type=float, default=0)
     parser.add_argument("-d", "--data_path", type=str, required=True)
     return parser.parse_args()
 
@@ -44,47 +45,54 @@ def read_model_dir(model_path):
     return model_state_dict, train_mean, train_std
 
 
-def evaluate_model(model, x, train_mean, train_std, results):
+def evaluate_model(model, x, train_mean, train_std, results, k=0):
     model.eval()
     race_ids = list(x.keys())
 
     number_of_races_bet = {}
     total_bet_count = {}
     correct_bet_count = {}
+    profits = {}
 
     for pool in ALL_POOLS:
         number_of_races_bet[pool] = 0
         total_bet_count[pool] = 0
         correct_bet_count[pool] = 0
+        profits[pool] = 0
 
     for race_id in tqdm(race_ids, desc="Evaluating races"):
         has_bet = set()
         this_x = torch.tensor(x[race_id], dtype=torch.float32, device=config.device)
         horse_nums = this_x[:, 10].tolist().copy()
         this_x = (this_x - train_mean) / train_std
-        bet = model.perform_bet(horse_nums, this_x, winner_k=0.05)
+        bet = model.perform_bet(horse_nums, this_x, k=k)
         actual_result = results[race_id]
 
         for pool, comb in bet:
             has_bet.add(pool)
             if pool == WIN or pool == PLACE:
-                if int(comb) in [int(x) for x in actual_result[pool]]:
-                    correct_bet_count[pool] += 1
+                for result in actual_result[pool]:
+                    if int(comb) == int(result["combination"]):
+                        correct_bet_count[pool] += 1
+                        profits[pool] += result["amount"]
+                        break
                 total_bet_count[pool] += 1
+                profits[pool] -= 10
             else:
                 raise NotImplementedError
 
         for p in has_bet:
             number_of_races_bet[p] += 1
 
-    return correct_bet_count, total_bet_count, number_of_races_bet, len(x)
+    return profits, correct_bet_count, total_bet_count, number_of_races_bet, len(x)
 
 
-def display_results(correct_bet_count, total_bet_count, number_of_races_bet, total_races):
+def display_results(profits, correct_bet_count, total_bet_count, number_of_races_bet, total_races):
     for pool in ALL_POOLS:
         if total_bet_count[pool] == 0:
             continue
         print(f"====== Statistics for pool {pool} ======")
+        print(f"Overall profit: {profits[pool]:.2f}")
         print(f"Correct bet count: {correct_bet_count[pool]}")
         print(f"Total bet count: {total_bet_count[pool]}")
         print(f"Accuracy: {correct_bet_count[pool] / total_bet_count[pool] * 100:.2f}%")
@@ -104,8 +112,9 @@ def main():
     model = load_model(model_name, metadata)
     model.load_state_dict(model_state_dict)
 
-    correct_bet_count, total_bet_count, number_of_races_bet, total_races = evaluate_model(model, data_x, train_mean, train_std, result)
-    display_results(correct_bet_count, total_bet_count, number_of_races_bet, total_races)
+    profits, correct_bet_count, total_bet_count, number_of_races_bet, total_races = (
+        evaluate_model(model, data_x, train_mean, train_std, result, k=args.k))
+    display_results(profits, correct_bet_count, total_bet_count, number_of_races_bet, total_races)
 
 
 if __name__ == '__main__':

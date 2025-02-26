@@ -1,12 +1,14 @@
 import torch
-from torch import nn
+import torch.nn as nn
 import torch.optim as optim
 
 from ._model import _Model
+from .utils import convert_ranking_to_score
+
 from utils.pools import *
 
 
-class WinnerBinary(_Model):
+class RankingScore(_Model):
     def __init__(self, input_size):
         super().__init__()
         self.model = nn.Sequential(
@@ -18,31 +20,30 @@ class WinnerBinary(_Model):
             nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.Linear(32, 1),
-            nn.Sigmoid()
         )
 
     def forward(self, x):
         return self.model(x)
 
     def optimizer(self):
-        return optim.SGD(self.parameters(), lr=1e-4, momentum=0.8, weight_decay=0.001)
+        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
 
     def criterion(self):
-        return nn.BCELoss()
+        return nn.MSELoss()
 
-    def format_y(self, y, **kwargs):
-        return (y[:, 0] == 1).unsqueeze(1).float()
+    def format_y(self, y):
+        return convert_ranking_to_score(y[:, 0]).unsqueeze(dim=1)
 
     def perform_bet(self, horse_nums, x, **kwargs):
-        k = kwargs.get("k", 0)
-        probabilities = self.forward(x).flatten().tolist()
+        k = kwargs.get('k', 0)
 
-        corresponding = list(zip(horse_nums, probabilities))
+        predictions = self.forward(x)
+        corresponding = list(zip(horse_nums, predictions))
         corresponding.sort(key=lambda x: x[1], reverse=True)
-
         first = corresponding[0]
         second = corresponding[1]
         fourth = corresponding[3]
+
         if first[1] - second[1] > k:
             return [(WIN, first[0]), (PLACE, first[0])]
         elif first[1] - fourth[1] > k:
