@@ -104,13 +104,14 @@ class DataLoader:
 
             this_top_3 = []
             this_x = np.zeros((m, self.size), dtype=np.float32)
-            this_y = np.zeros((m, 1), dtype=np.float32)
+            this_y = np.zeros((m, 2), dtype=np.float32)
             this_horse_nums = np.zeros(m, dtype=int)
 
             for i, p in enumerate(experienced_ps):
                 p_ranking = get_ranking_from_participation(p)
                 this_horse_nums[i] = p.number
                 this_y[i, 0] = p_ranking
+                this_y[i, 1] = p.win_odds
                 this_x[i] = self.load_participation(p)
 
                 if p_ranking <= 3:
@@ -150,7 +151,7 @@ class DataLoader:
         weighted_rating_diffs = calculate_weighted_rating(h_days, h_diffs, h_rating_hist)
 
         return np.array([
-            # individual participation features (6)
+            # individual participation features (8)
             p.rating,
             p.number,
             p.lane,
@@ -159,12 +160,12 @@ class DataLoader:
             p.gear_weight / (p.gear_weight + p.horse_weight),
 
             # race dependent features (6)
-            p.rating - mean_rating,
-            (p.rating - mean_rating) / std_rating,
-            max_rating - p.rating,
-            p.rating - min_rating,
-            p.lane / n,
-            p.number / n,
+            # p.rating - mean_rating,
+            # (p.rating - mean_rating) / std_rating,
+            # max_rating - p.rating,
+            # p.rating - min_rating,
+            # p.lane / n,
+            # p.number / n,
 
             # horse historic data (16)
             len(old_horse_ps),
@@ -185,8 +186,6 @@ class DataLoader:
             np.mean(weighted_rating_diffs),
             np.std(weighted_rating_diffs),
 
-            # horse's ability in specific distance / condition
-
             # jockey historic data (12)
             len(old_jockey_ps),
             get_ranking_from_participation(previous_jockey_p),
@@ -201,8 +200,6 @@ class DataLoader:
             calculate_weighted_ranking(j_days, j_diffs, j_rankings, mode=PLACE),
             calculate_weighted_ranking(j_days, j_diffs, j_rankings),
 
-            # jockey's ability in specific distance / condition
-
             # trainer historic data (8)
             len(p.horse.trainer.horses),
             np.mean(t_speeds),
@@ -212,9 +209,6 @@ class DataLoader:
             calculate_weighted_ranking(t_days, t_diffs, t_rankings, mode=WIN),
             calculate_weighted_ranking(t_days, t_diffs, t_rankings, mode=PLACE),
             calculate_weighted_ranking(t_days, t_diffs, t_rankings),
-
-            # jockey x trainer combo
-
         ], dtype=np.float32)
 
     def extract_info_from_ps(self, race_date, ps):
@@ -320,8 +314,7 @@ class DataLoader:
 
 def main():
     init_engine()
-    loader = DataLoader(size=48, distance=1400)
-
+    loader = DataLoader(size=42, distance=1400)
 
     data_x, data_y, horse_nums, top_3 = loader.load_data(
         start_date=datetime(2012,9,1).date(),
@@ -339,19 +332,21 @@ def main():
 
     loader.close()
 
-    os.mkdir("data3")
-    np.savez("data3/data_x.npz", **data_x)
-    np.savez("data3/data_y.npz", **data_y)
-    np.savez("data3/horse_nums.npz", **horse_nums)
-    np.savez("data3/top_3.npz", **top_3)
+    directory = "data2"
 
-    np.savez("data3/test_data_x.npz", **test_data_x)
-    np.savez("data3/test_horse_nums.npz", **test_horse_nums)
-    np.savez("data3/test_top_3.npz", **test_top_3)
+    os.makedirs(directory, exist_ok=True)
+    np.savez(f"{directory}/data_x.npz", **data_x)
+    np.savez(f"{directory}/data_y.npz", **data_y)
+    np.savez(f"{directory}/horse_nums.npz", **horse_nums)
+    np.savez(f"{directory}/top_3.npz", **top_3)
 
-    np.savez("data3/final_data_x.npz", **final_data_x)
-    np.savez("data3/final_horse_nums.npz", **final_horse_nums)
-    np.savez("data3/final_top_3.npz", **final_top_3)
+    np.savez(f"{directory}/test_data_x.npz", **test_data_x)
+    np.savez(f"{directory}/test_horse_nums.npz", **test_horse_nums)
+    np.savez(f"{directory}/test_top_3.npz", **test_top_3)
+
+    np.savez(f"{directory}/final_data_x.npz", **final_data_x)
+    np.savez(f"{directory}/final_horse_nums.npz", **final_horse_nums)
+    np.savez(f"{directory}/final_top_3.npz", **final_top_3)
 
 
 if __name__ == '__main__':

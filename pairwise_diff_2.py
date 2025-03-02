@@ -15,8 +15,8 @@ def get_mean_std(data_x):
 
 
 def convert_ranking_to_relevance_score(ranking, decay_sharpness=2):
+    # return (14 - ranking) / 14
     return 1 / np.log(ranking + decay_sharpness)
-
 
 
 def convert_dataset(data_x, data_y, target_keys):
@@ -39,24 +39,24 @@ def convert_dataset(data_x, data_y, target_keys):
     return result_x, result_y
 
 
-def transform_to_pairwise_diff(x, rankings):
+def transform_to_pairwise_diff(x, speeds):
     m, n = x.shape
     result_x = np.zeros((m * (m - 1), n * 2))
-    if rankings is not None:
+    if speeds is not None:
         result_y = np.zeros((m * (m - 1), 1))
     idx = 0
     for i in range(m):
         for j in range(m):
             if i == j:
                 continue
-            result_x[idx, :n] = x[i]
-            result_x[idx, n:] = x[j]
-            if rankings is not None:
-                fst_score = convert_ranking_to_relevance_score(rankings[i])
-                snd_score = convert_ranking_to_relevance_score(rankings[j])
+            result_x[idx, :n] = x[i] - x[j]
+            result_x[idx, n:] = x[i] + x[j]
+            if speeds is not None:
+                fst_score = convert_ranking_to_relevance_score(speeds[i])
+                snd_score = convert_ranking_to_relevance_score(speeds[j])
                 result_y[idx] = fst_score - snd_score
             idx += 1
-    if rankings is not None:
+    if speeds is not None:
         return result_x, result_y
     else:
         return result_x
@@ -163,9 +163,9 @@ class PairwiseDiffBin(nn.Module):
     def __init__(self):
         super(PairwiseDiffBin, self).__init__()
         self.model = nn.Sequential(
-            nn.Linear(96, 24),
+            nn.Linear(96, 9),
             nn.ReLU(),
-            nn.Linear(24, 1)
+            nn.Linear(9, 1)
         )
 
     def forward(self, x):
@@ -173,18 +173,19 @@ class PairwiseDiffBin(nn.Module):
 
 
     def optimizer(self):
-        return optim.SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+        return optim.SGD(self.parameters(), lr=0.01, weight_decay=5e-4, momentum=0.9)
 
 
 def main():
-    data_x = np.load("data3/data_x.npz")
-    data_y = np.load("data3/data_y.npz")
-    horse_nums = np.load("data3/horse_nums.npz")
-    top_3 = np.load("data3/top_3.npz")
+    directory = "data2"
+    data_x = np.load(f"{directory}/data_x.npz")
+    data_y = np.load(f"{directory}/data_y.npz")
+    horse_nums = np.load(f"{directory}/horse_nums.npz")
+    top_3 = np.load(f"{directory}/top_3.npz")
     
-    test_data_x = np.load("data3/test_data_x.npz")
-    test_horse_nums = np.load("data3/test_horse_nums.npz")
-    test_top_3 = np.load("data3/test_top_3.npz")    
+    test_data_x = np.load(f"{directory}/test_data_x.npz")
+    test_horse_nums = np.load(f"{directory}/test_horse_nums.npz")
+    test_top_3 = np.load(f"{directory}/test_top_3.npz")    
 
     model = PairwiseDiffBin().to("cuda")
 
