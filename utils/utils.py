@@ -45,6 +45,21 @@ def get_track_width(location, track):
         raise Exception(f"Unknown location: {location}")
 
 
+def is_new_horse(p):
+    for this_p in p.horse.participations:
+        if this_p.finish_time is not None and this_p.race.date < p.race.date:
+            return False
+    return True
+
+
+def is_new_jockey(p):
+    for this_p in p.jockey.participations:
+        if this_p.finish_time is not None and this_p.race.date < p.race.date:
+            return False
+    return True
+
+
+
 MAX_NUMBER_OF_HORSES = 14
 
 RACE_LOWER_LIMIT = [100, 80, 60, 40, 0]
