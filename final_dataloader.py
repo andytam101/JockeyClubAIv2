@@ -21,7 +21,7 @@ def get_seconds_from_time(t: time) -> float:
 def get_speed(p: Participation) -> float:
     # time in m/s
     distance = p.race.distance
-    seconds = get_seconds_from_time(distance)
+    seconds = get_seconds_from_time(p.finish_time)
     return distance / seconds
 
 
