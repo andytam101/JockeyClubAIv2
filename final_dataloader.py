@@ -169,7 +169,7 @@ def get_old_trainer_ps(session, trainer_id, before):
 
 def extract_info_from_ps(race_date, ps):
     n = len(ps)
-    result = np.zeros((n, 11), dtype=np.float64)
+    result = np.zeros((n, 12), dtype=np.float64)
 
     for i, p in enumerate(ps):
         participants = get_total_participants(p.race)
@@ -182,8 +182,9 @@ def extract_info_from_ps(race_date, ps):
         result[i, 6] = get_adjusted_speed(p)
         result[i, 7] = get_ranking_from_participation(p)
         result[i, 8] = p.rating
-        result[i, 9] = get_adjusted_win_odds(p.win_odds, participants)
+        result[i, 9] = 1 / get_adjusted_win_odds(p.win_odds, participants)
         result[i, 10] = get_adjusted_beaten_time(p)
+        result[i, 11] = p.horse_weight
 
     return result
 
@@ -194,76 +195,6 @@ def normalize_weights(*weights):
     for w in weights:
         result.append(w / total)
     return result
-
-
-def get_weighted_speed(time_relevancy, track_relevancy, speeds, time_weighting=0.7, track_weighting=0.3):
-    time_weighting, track_weighting = normalize_weights(time_weighting, track_weighting)
-    total_weights = time_weighting * time_relevancy + track_weighting * track_relevancy
-    return np.dot(total_weights, speeds) / np.sum(total_weights)
-
-
-def get_weighted_ranking(
-    time_relevancy,
-    track_relevancy,
-    race_difficulty,
-    ranking,
-    participants,
-    mode=None,
-    time_weight=0.3,
-    track_weight=0.2,
-    difficulty_weight=0.5
-):
-    time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-    total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-
-    if mode == WIN:
-        ranking = (ranking == 1).astype(np.float64)
-        score = ranking
-    elif mode == PLACE:
-        ranking = is_place(ranking, participants).astype(np.float64)
-        score = ranking
-    else:
-        ranking = get_adjusted_ranking(ranking, participants)
-        score = get_score_from_ranking(ranking)
-
-    return np.dot(score, total_weights) / np.sum(total_weights)
-
-
-def get_weighted_delta_rating(
-    time_relevancy,
-    track_relevancy,
-    race_difficulty,
-    rating_hist,
-    current_rating,
-    time_weight=0.3,
-    track_weight=0.2,
-    difficulty_weight=0.5,
-):
-    raise NotImplementedError("both +ve and -ve rating changes should scale in respective ways")
-    time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-
-    n = rating_hist.shape[0]
-    rating_diff = np.zeros(n, dtype=np.float64)
-    rating_diff[:n - 1] = np.diff(rating_hist)
-    rating_diff[n - 1] = current_rating - rating_hist[-1]
-
-    total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-    return np.dot(total_weights, rating_diff) / np.sum(total_weights)
-
-
-def get_weighted_beaten_length(
-    time_relevancy,
-    track_relevancy,
-    race_difficulty,
-    beaten_length,
-    time_weight=0.3,
-    track_weight=0.2,
-    difficulty_weight=0.5,
-):
-    time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-    total_weight = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-
-    return np.dot(total_weight, beaten_length) / np.sum(total_weight)
 
 
 def get_track_relevancy(
@@ -282,8 +213,11 @@ def get_track_relevancy(
 
 
 def scale_by_difficulty(difficulty, variable):
-    n = difficulty.shape[0]
-    return difficulty * variable * n / np.sum(difficulty)
+    raise NotImplementedError
+
+
+def scale_jockey_by_horse_rating(rating, variable):
+    raise NotImplementedError
 
 
 def weigh_by_relevancy_mean(time_relevancy, track_relevancy, variable, time_weight=0.7, track_weight=0.3):
@@ -352,6 +286,14 @@ def load_data(session, size, start_date, end_date, distance):
     return all_x, all_y, horse_nums, winners, places
 
 
+def get_delta_rating(rating_hist, curr_rating):
+    n = rating_hist.shape[0]
+    result = np.zeros(n, dtype=np.float64)
+    result[:n-1] = np.diff(rating_hist)
+    result[n - 1] = curr_rating - rating_hist[-1]
+    return result
+
+
 def load_p(session, p: Participation):
     trainer = p.horse.trainer
 
@@ -388,16 +330,18 @@ def load_p(session, p: Participation):
     # 6. Adjusted speed
     # 7. Ranking
     # 8. Rating
-    # 9. Adjusted win odds
-    # 10. Adjusted beaten length
-
+    # 9. Adjusted win odds reciprocal
+    # 10. Adjusted beaten time
 
     # Speeds
+    horse_max_speed = np.max(horse_ps_info[6])
     horse_mean_weighted_speed = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_ps_info[6])
     horse_std_weighted_speed = weigh_by_relevancy_std(horse_time_relevancy, horse_track_relevancy, horse_ps_info[6], horse_mean_weighted_speed)
 
-    jockey_mean_weighted_speed = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, trainer_ps_info[6])
-    jockey_std_weighted_speed = weigh_by_relevancy_std(jockey_time_relevancy, jockey_track_relevancy, trainer_ps_info[6], jockey_mean_weighted_speed)
+    jockey_scaled_speeds = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_ps_info[6])
+    jockey_max_speed = np.max(jockey_ps_info[6])
+    jockey_mean_weighted_speed = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_scaled_speeds)
+    jockey_std_weighted_speed = weigh_by_relevancy_std(jockey_time_relevancy, jockey_track_relevancy, jockey_scaled_speeds, jockey_mean_weighted_speed)
 
     trainer_mean_weighted_speed = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[6])
     trainer_std_weighted_speed = weigh_by_relevancy_std(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[6], trainer_mean_weighted_speed)
@@ -414,8 +358,11 @@ def load_p(session, p: Participation):
 
     jockey_score = get_score_from_ranking(get_adjusted_ranking(jockey_ps_info[7], jockey_ps_info[5]))
     jockey_scaled_win_rate = scale_by_difficulty(jockey_race_difficulty, (jockey_ps_info[7] == 1).astype(np.float64))
+    jockey_scaled_win_rate = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_scaled_win_rate)
     jockey_scaled_place_rate = scale_by_difficulty(jockey_race_difficulty, is_place(jockey_ps_info[7], jockey_ps_info[5]).astype(np.float64))
+    jockey_scaled_place_rate = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_scaled_place_rate)
     jockey_scaled_score = scale_by_difficulty(jockey_race_difficulty, jockey_score)
+    jockey_scaled_score = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_scaled_score)
     jockey_mean_weighted_win_rate = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_scaled_win_rate)
     jockey_mean_weighted_place_rate = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_scaled_place_rate)
     jockey_mean_weighted_score = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_scaled_score)
@@ -437,15 +384,45 @@ def load_p(session, p: Participation):
     horse_mean_weighted_rating = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_ps_info[8], track_weight=0)
     horse_std_weighted_rating = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_ps_info[8], horse_mean_weighted_rating, track_weight=0)
 
-    # TODO: delta rating
+    horse_delta_rating = get_delta_rating(horse_ps_info[8], p.rating)
+    horse_adjusted_delta_rating = scale_by_difficulty(horse_race_difficulty, horse_delta_rating)
+    horse_mean_weighted_delta_rating = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_adjusted_delta_rating)
+    horse_std_weighted_delta_rating = weigh_by_relevancy_std(horse_time_relevancy, horse_track_relevancy, horse_adjusted_delta_rating, horse_mean_weighted_delta_rating)
 
     trainer_mean_weighted_rating = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[8], track_weight=0)
     trainer_std_weighted_rating = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[8], trainer_mean_weighted_rating, track_weight=0)
 
     # Beaten length
+    horse_adjusted_beaten_time = scale_by_difficulty(horse_race_difficulty, horse_ps_info[10])
+    horse_mean_weighted_beaten_time = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_adjusted_beaten_time)
+    horse_std_weighted_beaten_time = weigh_by_relevancy_std(horse_time_relevancy, horse_track_relevancy, horse_adjusted_beaten_time, horse_mean_weighted_beaten_time)
 
+    jockey_adjusted_beaten_time = scale_by_difficulty(jockey_race_difficulty, jockey_ps_info[10])
+    jockey_adjusted_beaten_time = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_adjusted_beaten_time)
+    jockey_mean_weighted_beaten_time = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_adjusted_beaten_time)
+    jockey_std_weighted_beaten_time = weigh_by_relevancy_std(jockey_time_relevancy, jockey_track_relevancy, jockey_adjusted_beaten_time, jockey_mean_weighted_beaten_time)
 
-    # Win odds
+    trainer_adjusted_beaten_time = scale_by_difficulty(trainer_race_difficulty, trainer_ps_info[10])
+    trainer_mean_weighted_beaten_time = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_adjusted_beaten_time)
+    trainer_std_weighted_beaten_time = weigh_by_relevancy_std(trainer_time_relevancy, trainer_track_relevancy, trainer_adjusted_beaten_time, trainer_mean_weighted_beaten_time)
+
+    # Win odds reciprocal
+    # TODO: capture change in win odds? capture win odds to performance (speed / score) ratio?
+    horse_adjusted_win_odds = scale_by_difficulty(horse_race_difficulty, horse_ps_info[9])
+    horse_mean_weighted_win_odds = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_adjusted_win_odds)
+    horse_std_weighted_win_odds = weigh_by_relevancy_std(horse_time_relevancy, horse_track_relevancy, horse_adjusted_win_odds, horse_mean_weighted_win_odds)
+
+    jockey_adjusted_win_odds = scale_by_difficulty(jockey_race_difficulty, jockey_ps_info[9])
+    jockey_adjusted_win_odds = scale_jockey_by_horse_rating(jockey_ps_info[8], jockey_adjusted_win_odds)
+    jockey_mean_weighted_win_odds = weigh_by_relevancy_mean(jockey_time_relevancy, jockey_track_relevancy, jockey_adjusted_win_odds)
+    jockey_std_weighted_win_odds = weigh_by_relevancy_std(jockey_time_relevancy, jockey_track_relevancy, jockey_adjusted_win_odds, jockey_mean_weighted_win_odds)
+
+    trainer_adjusted_win_odds = scale_by_difficulty(trainer_race_difficulty, trainer_ps_info[9])
+    trainer_mean_weighted_win_odds = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_adjusted_win_odds)
+    trainer_std_weighted_win_odds = weigh_by_relevancy_std(trainer_time_relevancy, trainer_track_relevancy, trainer_adjusted_win_odds, trainer_mean_weighted_win_odds)
+
+    # horse weight
+    horse_mean_weighted_horse_weight = weigh_by_relevancy_mean(horse_time_relevancy, horse_track_relevancy, horse_ps_info[11], track_weight=0)
 
 
     return np.array([
@@ -462,45 +439,61 @@ def load_p(session, p: Participation):
         p.rating - previous_horse_p.rating,
         (p.race.date - previous_horse_p.race.date).days,
         get_adjusted_beaten_time(previous_horse_p),
+        p.horse_weight - previous_horse_p.horse_weight,
 
         # previous jockey stats (3)
         get_adjusted_speed(previous_jockey_p),
         (p.race.date - previous_jockey_p.race.date).days,
         get_adjusted_beaten_time(previous_jockey_p),
 
-        # horse historic data (6)
+        # horse historic data (17)
         len(old_horse_ps),
-        get_weighted_speed(horse_time_relevancy, horse_track_relevancy, horse_ps_info[6]),  # measure speed but with weighted mean
-        np.std(horse_ps_info[6]),                                                           # measure consistency of speed
-        get_weighted_ranking(horse_time_relevancy, horse_track_relevancy, horse_race_difficulty, horse_ps_info[7], horse_ps_info[5], mode=WIN),
-        get_weighted_ranking(horse_time_relevancy, horse_track_relevancy, horse_race_difficulty, horse_ps_info[7], horse_ps_info[5], mode=PLACE),
-        get_weighted_ranking(horse_time_relevancy, horse_track_relevancy, horse_race_difficulty, horse_ps_info[7], horse_ps_info[5]),
-        np.std(get_adjusted_ranking(horse_ps_info[7], horse_ps_info[5])),    # ranking consistency
-        get_weighted_delta_rating(horse_time_relevancy, horse_track_relevancy, horse_race_difficulty, horse_ps_info[8], p.rating),
-        get_weighted_beaten_length(horse_time_relevancy, horse_track_relevancy, horse_race_difficulty, horse_ps_info[10]),
-        # capture consistency of beaten length
+        horse_max_speed,
+        horse_mean_weighted_speed,
+        horse_std_weighted_speed,
+        horse_mean_weighted_win_rate,
+        horse_mean_weighted_place_rate,
+        horse_mean_weighted_score,
+        horse_std_weighted_score,
+        horse_mean_weighted_rating,
+        horse_std_weighted_rating,
+        horse_mean_weighted_delta_rating,
+        horse_std_weighted_delta_rating,
+        horse_mean_weighted_beaten_time,
+        horse_std_weighted_beaten_time,
+        horse_mean_weighted_win_odds,
+        horse_std_weighted_win_odds,
+        horse_mean_weighted_horse_weight,
 
-        # jockey historic data (6)
+        # jockey historic data (13)
         len(old_jockey_ps),
-        get_weighted_speed(jockey_time_relevancy, jockey_track_relevancy, jockey_ps_info[6]),
-        np.std(jockey_ps_info[6]),
-        get_weighted_ranking(jockey_time_relevancy, jockey_track_relevancy, jockey_race_difficulty, jockey_ps_info[7], jockey_ps_info[5], mode=WIN),
-        get_weighted_ranking(jockey_time_relevancy, jockey_track_relevancy, jockey_race_difficulty, jockey_ps_info[7], jockey_ps_info[5], mode=PLACE),
-        get_weighted_ranking(jockey_time_relevancy, jockey_track_relevancy, jockey_race_difficulty, jockey_ps_info[7], jockey_ps_info[5]),
-        np.std(get_adjusted_ranking(jockey_ps_info[7], jockey_ps_info[5])),   # ranking consistency
-        get_weighted_beaten_length(jockey_time_relevancy, jockey_track_relevancy, jockey_race_difficulty, jockey_ps_info[10]),
-        # capture consistency of beaten length
+        jockey_max_speed,           # max scaled speed (by horse rating)
+        np.max(jockey_ps_info[6]),  # max adjusted speed
+        jockey_mean_weighted_speed,
+        jockey_std_weighted_speed,
+        jockey_mean_weighted_win_rate,
+        jockey_mean_weighted_place_rate,
+        jockey_mean_weighted_score,
+        jockey_std_weighted_score,
+        jockey_mean_weighted_beaten_time,
+        jockey_std_weighted_beaten_time,
+        jockey_mean_weighted_win_odds,
+        jockey_std_weighted_win_odds,
 
-        # trainer historic data (8)
+        # trainer historic data (13)
         len(trainer.horses),
-        get_weighted_speed(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[6]),
-        np.std(trainer_ps_info[6]),
-        get_weighted_ranking(trainer_time_relevancy, trainer_track_relevancy, trainer_race_difficulty, trainer_ps_info[7], trainer_ps_info[5], mode=WIN),
-        get_weighted_ranking(trainer_time_relevancy, trainer_track_relevancy, trainer_race_difficulty, trainer_ps_info[7], trainer_ps_info[5], mode=PLACE),
-        get_weighted_ranking(trainer_time_relevancy, trainer_track_relevancy, trainer_race_difficulty, trainer_ps_info[7], trainer_ps_info[5]),
-        np.std(get_adjusted_ranking(trainer_ps_info[7], trainer_ps_info[5])),  # ranking consistency
-        np.mean(trainer_ps_info[8]),
-        np.std(trainer_ps_info[8]),
+        trainer_mean_weighted_speed,
+        trainer_std_weighted_speed,
+        trainer_mean_weighted_win_rate,
+        trainer_mean_weighted_place_rate,
+        trainer_mean_weighted_score,
+        trainer_std_weighted_score,
+        trainer_mean_weighted_rating,
+        trainer_std_weighted_rating,
+        trainer_mean_weighted_beaten_time,
+        trainer_std_weighted_beaten_time,
+        trainer_mean_weighted_win_odds,
+        trainer_std_weighted_win_odds,
 
         # jockey x trainer combo
 
@@ -529,3 +522,73 @@ def main():
     session = get_session()
 
     session.close()
+
+
+# OLD UNDELETED CODE:
+# def get_weighted_speed(time_relevancy, track_relevancy, speeds, time_weighting=0.7, track_weighting=0.3):
+#     time_weighting, track_weighting = normalize_weights(time_weighting, track_weighting)
+#     total_weights = time_weighting * time_relevancy + track_weighting * track_relevancy
+#     return np.dot(total_weights, speeds) / np.sum(total_weights)
+#
+#
+# def get_weighted_ranking(
+#     time_relevancy,
+#     track_relevancy,
+#     race_difficulty,
+#     ranking,
+#     participants,
+#     mode=None,
+#     time_weight=0.3,
+#     track_weight=0.2,
+#     difficulty_weight=0.5
+# ):
+#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
+#     total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
+#
+#     if mode == WIN:
+#         ranking = (ranking == 1).astype(np.float64)
+#         score = ranking
+#     elif mode == PLACE:
+#         ranking = is_place(ranking, participants).astype(np.float64)
+#         score = ranking
+#     else:
+#         ranking = get_adjusted_ranking(ranking, participants)
+#         score = get_score_from_ranking(ranking)
+#
+#     return np.dot(score, total_weights) / np.sum(total_weights)
+#
+#
+# def get_weighted_delta_rating(
+#     time_relevancy,
+#     track_relevancy,
+#     race_difficulty,
+#     rating_hist,
+#     current_rating,
+#     time_weight=0.3,
+#     track_weight=0.2,
+#     difficulty_weight=0.5,
+# ):
+#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
+#
+#     n = rating_hist.shape[0]
+#     rating_diff = np.zeros(n, dtype=np.float64)
+#     rating_diff[:n - 1] = np.diff(rating_hist)
+#     rating_diff[n - 1] = current_rating - rating_hist[-1]
+#
+#     total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
+#     return np.dot(total_weights, rating_diff) / np.sum(total_weights)
+#
+#
+# def get_weighted_beaten_length(
+#     time_relevancy,
+#     track_relevancy,
+#     race_difficulty,
+#     beaten_length,
+#     time_weight=0.3,
+#     track_weight=0.2,
+#     difficulty_weight=0.5,
+# ):
+#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
+#     total_weight = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
+#
+#     return np.dot(total_weight, beaten_length) / np.sum(total_weight)
