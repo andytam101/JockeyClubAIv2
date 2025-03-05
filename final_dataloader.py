@@ -5,7 +5,6 @@ from database import Race, Participation, Horse, Trainer, init_engine, get_sessi
 from datetime import time
 
 from utils import utils
-from utils.pools import WIN, PLACE
 
 from functools import lru_cache
 from tqdm import tqdm
@@ -167,6 +166,20 @@ def get_old_trainer_ps(session, trainer_id, before):
     return result
 
 
+def get_old_jt_combo_ps(session, jockey_id, trainer_id, before):
+    ps = (session.query(Participation)
+        .join(Participation.race)
+        .join(Participation.horse)
+        .join(Horse.trainer)
+        .filter(Participation.jockey_id == jockey_id)
+        .filter(Trainer.id == trainer_id)
+        .filter(Race.date < before)
+        .order_by(Race.date)
+    .all())
+    result = utils.remove_unranked_participants(ps)
+    return result
+
+
 def extract_info_from_ps(race_date, ps):
     n = len(ps)
     result = np.zeros((n, 12), dtype=np.float64)
@@ -300,6 +313,7 @@ def load_p(session, p: Participation):
     old_horse_ps = get_old_horse_ps(session, p.horse_id, p.race.date)
     old_jockey_ps = get_old_jockey_ps(session, p.jockey_id, p.race.date)[-50:]
     old_trainer_ps = get_old_trainer_ps(session, p.horse.trainer_id, p.race.date)[-300:]
+    old_jt_combo_ps = get_old_jt_combo_ps(session, p.jockey_id, p.horse.trainer_id, p.race.date)
 
     previous_horse_p = old_horse_ps[-1]
     previous_jockey_p = old_jockey_ps[-1]
@@ -307,18 +321,22 @@ def load_p(session, p: Participation):
     horse_ps_info = extract_info_from_ps(p.race.date, old_horse_ps)
     jockey_ps_info = extract_info_from_ps(p.race.date, old_jockey_ps)
     trainer_ps_info = extract_info_from_ps(p.race.date, old_trainer_ps)
+    jt_combo_ps_info = extract_info_from_ps(p.race.date, old_jt_combo_ps)
 
     horse_time_relevancy = horse_ps_info[0]
     jockey_time_relevancy = jockey_ps_info[0]
     trainer_time_relevancy = trainer_ps_info[0]
+    jt_combo_time_relevancy = jt_combo_ps_info[0]
 
     horse_track_relevancy = get_track_relevancy(p.race.distance, p.race.location, p.race.condition, horse_ps_info[1], horse_ps_info[2], horse_ps_info[3])
     jockey_track_relevancy = get_track_relevancy(p.race.distance, p.race.location, p.race.condtion, jockey_ps_info[1], jockey_ps_info[2], jockey_ps_info[3])
     trainer_track_relevancy = get_track_relevancy(p.race.distance, p.race.location, p.race.condition, trainer_ps_info[1], trainer_ps_info[2], trainer_ps_info[3])
+    jt_combo_track_relevancy = get_track_relevancy(p.race.distance, p.race.location, p.race.condition, jt_combo_ps_info[1], jt_combo_ps_info[2], jt_combo_ps_info[3])
 
     horse_race_difficulty = horse_ps_info[4]
     jockey_race_difficulty = jockey_ps_info[4]
     trainer_race_difficulty = trainer_ps_info[4]
+    jt_combo_race_difficulty = jt_combo_ps_info[4]
 
     # Info is as follows:
     # 0. Time relevancy
@@ -345,6 +363,9 @@ def load_p(session, p: Participation):
 
     trainer_mean_weighted_speed = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[6])
     trainer_std_weighted_speed = weigh_by_relevancy_std(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[6], trainer_mean_weighted_speed)
+    
+    jt_combo_mean_weighted_speed = weigh_by_relevancy_mean(jt_combo_time_relevancy, jt_combo_track_relevancy, jt_combo_ps_info[6])
+    jt_combo_std_weighted_speed = weigh_by_relevancy_std(jt_combo_time_relevancy, jt_combo_track_relevancy, jt_combo_ps_info[6], jt_combo_mean_weighted_speed)
 
     # Rankings
     horse_score = get_score_from_ranking(get_adjusted_ranking(horse_ps_info[7], horse_ps_info[5]))
@@ -376,6 +397,15 @@ def load_p(session, p: Participation):
     trainer_mean_weighted_place_rate = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy,trainer_scaled_place_rate)
     trainer_mean_weighted_score = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy,trainer_scaled_score)
     trainer_std_weighted_score = weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy,trainer_scaled_score, trainer_mean_weighted_score)
+
+    jt_combo_score = get_score_from_ranking(get_adjusted_ranking(jt_combo_ps_info[7], jt_combo_ps_info[5]))
+    jt_combo_scaled_win_rate = scale_by_difficulty(jt_combo_race_difficulty, (jt_combo_ps_info[7] == 1).astype(np.float64))
+    jt_combo_scaled_place_rate = scale_by_difficulty(jt_combo_race_difficulty,is_place(jt_combo_ps_info[7], jt_combo_ps_info[5]).astype(np.float64))
+    jt_combo_scaled_score = scale_by_difficulty(jt_combo_race_difficulty, jt_combo_score)
+    jt_combo_mean_weighted_win_rate = weigh_by_relevancy_mean(jt_combo_time_relevancy, jt_combo_track_relevancy,jt_combo_scaled_win_rate)
+    jt_combo_mean_weighted_place_rate = weigh_by_relevancy_mean(jt_combo_time_relevancy, jt_combo_track_relevancy,jt_combo_scaled_place_rate)
+    jt_combo_mean_weighted_score = weigh_by_relevancy_mean(jt_combo_time_relevancy, jt_combo_track_relevancy, jt_combo_scaled_score)
+    jt_combo_std_weighted_score = weigh_by_relevancy_mean(jt_combo_time_relevancy, jt_combo_track_relevancy, jt_combo_scaled_score,jt_combo_mean_weighted_score)
 
     # Ratings
     # a) horse should use both rating and rating diff
@@ -434,9 +464,10 @@ def load_p(session, p: Participation):
         p.gear_weight,
         p.gear_weight / (p.horse_weight + p.horse_weight),
 
-        # previous horse stats (4)
+        # previous horse stats (6)
         get_adjusted_speed(previous_horse_p),
         p.rating - previous_horse_p.rating,
+        get_adjusted_win_odds(previous_horse_p, get_total_participants(previous_horse_p.race)),
         (p.race.date - previous_horse_p.race.date).days,
         get_adjusted_beaten_time(previous_horse_p),
         p.horse_weight - previous_horse_p.horse_weight,
@@ -446,7 +477,7 @@ def load_p(session, p: Participation):
         (p.race.date - previous_jockey_p.race.date).days,
         get_adjusted_beaten_time(previous_jockey_p),
 
-        # horse historic data (17)
+        # horse historic data (16)
         len(old_horse_ps),
         horse_max_speed,
         horse_mean_weighted_speed,
@@ -463,7 +494,6 @@ def load_p(session, p: Participation):
         horse_std_weighted_beaten_time,
         horse_mean_weighted_win_odds,
         horse_std_weighted_win_odds,
-        horse_mean_weighted_horse_weight,
 
         # jockey historic data (13)
         len(old_jockey_ps),
@@ -495,8 +525,14 @@ def load_p(session, p: Participation):
         trainer_mean_weighted_win_odds,
         trainer_std_weighted_win_odds,
 
-        # jockey x trainer combo
-
+        # jockey x trainer combo (7)
+        len(old_jt_combo_ps),
+        jt_combo_mean_weighted_speed,
+        jt_combo_std_weighted_speed,
+        jt_combo_mean_weighted_win_rate,
+        jt_combo_mean_weighted_place_rate,
+        jt_combo_mean_weighted_score,
+        jt_combo_std_weighted_score,
     ], dtype=np.float64)
 
 
