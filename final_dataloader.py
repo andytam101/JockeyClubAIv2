@@ -136,8 +136,6 @@ class FinalDataLoader:
         start_date,
         end_date,
         distance,
-        scale_data=True,
-        weigh_data=True,
     ):
         races = self.extract_races(start_date, end_date, distance)
         size = self.size
@@ -172,7 +170,7 @@ class FinalDataLoader:
                 this_y[i, 3] = p.win_odds
                 this_y[i, 4] = participants
 
-                this_x[i] = self.load_p(p, scale_data, weigh_data)
+                this_x[i] = self.load_p(p)
 
                 if p_ranking == 1:
                     this_winners.append(p.number)
@@ -251,7 +249,7 @@ class FinalDataLoader:
     
             return np.dot(weight, variable) / np.sum(weight)
         else:
-            return np.std(variable)
+            return np.mean(variable)
 
     def weigh_by_relevancy_std(self, time_relevancy, track_relevancy, variable, weighted_mean, time_weight=0.7, track_weight=0.3):
         if self.weigh_data:
@@ -716,18 +714,7 @@ Factors that can affect speed
 """
 
 
-def main():
-    init_engine()
-
-    dataloader = FinalDataLoader()
-    all_x, all_y, horse_nums, wins, places = dataloader.load_data(start_date=datetime(2012, 9, 1).date(), end_date=datetime(2022, 9, 1).date(), distance=1400)
-
-    race_speeds_mean_std = dataloader.speeds_mean_std
-    race_log_win_odds_mean_std = dataloader.log_win_odds_mean_std
-    race_diff_mean = dataloader.race_difficulty_mean
-    race_diff_std = dataloader.race_difficulty_std
-
-    directory = "final_data"
+def save_data(directory, all_x, all_y, horse_nums, wins, places):
     os.makedirs(directory, exist_ok=True)
 
     np.savez(f"{directory}/data_x.npz", **all_x)
@@ -736,98 +723,63 @@ def main():
     np.savez(f"{directory}/wins.npz", **wins)
     np.savez(f"{directory}/places.npz", **places)
 
-    print(f"Race diff mean: {race_diff_mean}")
-    print(f"Race diff std: {race_diff_std}")
 
-    print("======= Speed ========")
-    for distance in race_speeds_mean_std:
-        print(f"{distance}: {race_speeds_mean_std[distance]}")
+def load_all_for_distance(dataloader: FinalDataLoader, distance, directory):
+    # both
+    dataloader.scale_data = True
+    dataloader.weigh_data = True
+    both_path = os.path.join(directory, "both")
+    load_train_test_data(dataloader, both_path, distance)
 
-    print("==== Log win Odds ====")
-    for number in race_log_win_odds_mean_std:
-        print(f"{number}: {race_log_win_odds_mean_std[number]}")
+    # scaled
+    dataloader.weigh_data = False
+    scaled_path = os.path.join(directory, "scaled")
+    load_train_test_data(dataloader, scaled_path, distance)
+
+    # weighed
+    dataloader.weigh_data = True
+    dataloader.scale_data = False
+    weighed_path = os.path.join(directory, "weighed")
+    load_train_test_data(dataloader, weighed_path, distance)
+
+    # neither
+    dataloader.weigh_data = False
+    neither_path = os.path.join(directory, "neither")
+    load_train_test_data(dataloader, neither_path, distance)
+
+
+def load_train_test_data(dataloader, directory, distance):
+    train_start_date = datetime(2012, 9, 1).date()
+    train_end_date = datetime(2022, 9, 1).date()
+    test_start_date = datetime(2022, 9, 1).date()
+    test_end_date = datetime(2025, 9, 1).date()
+
+    train_x, train_y, horse_nums, wins, places = dataloader.load_data(train_start_date, train_end_date, distance)
+    test_x, test_y, test_horse_nums, test_wins, test_places = dataloader.load_data(test_start_date, test_end_date, distance)
+
+    train_dir = os.path.join(directory, "train")
+    test_dir = os.path.join(directory, "test")
+
+    save_data(train_dir, train_x, train_y, horse_nums, wins, places)
+    save_data(test_dir, test_x, test_y, test_horse_nums, test_wins, test_places)
+
+
+def main():
+    init_engine()
+    dataloader = FinalDataLoader()
+
+    dataloader.setup()
+
+    distances = [None, 1000, 1200, 1400, 1600, 1650, 1800, 2000, 2200, 2400]
+    distances_path = ["combined"] + [f"distance_{d}" for d in distances[1:]]
+
+    for i in range(len(distances)):
+        this_distance = distances[i]
+        this_path = distances_path[i]
+
+        load_all_for_distance(dataloader, this_distance, this_path)
+
 
 if __name__ == "__main__":
     main()
-
-
-############# WHAT IS NEEDED ###############
-# 1. speed -> adjust by distance
-# 2. ranking -> adjust by number, scale by rating
-# 3. win / place rate -> scale by rating, scale by number
-# 4. rating diff -> nothing
-# 5. rating -> nothing
-# 6. win odds -> adjust by number, scale by rating difficulty
-# 7. beaten length -> adjust by distance (via adjusted speed), scale by number difficulty, scale by rating difficulty
-
-
-
-# OLD UNDELETED CODE:
-# def get_weighted_speed(time_relevancy, track_relevancy, speeds, time_weighting=0.7, track_weighting=0.3):
-#     time_weighting, track_weighting = normalize_weights(time_weighting, track_weighting)
-#     total_weights = time_weighting * time_relevancy + track_weighting * track_relevancy
-#     return np.dot(total_weights, speeds) / np.sum(total_weights)
-#
-#
-# def get_weighted_ranking(
-#     time_relevancy,
-#     track_relevancy,
-#     race_difficulty,
-#     ranking,
-#     participants,
-#     mode=None,
-#     time_weight=0.3,
-#     track_weight=0.2,
-#     difficulty_weight=0.5
-# ):
-#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-#     total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-#
-#     if mode == WIN:
-#         ranking = (ranking == 1).astype(np.float64)
-#         score = ranking
-#     elif mode == PLACE:
-#         ranking = is_place(ranking, participants).astype(np.float64)
-#         score = ranking
-#     else:
-#         ranking = get_adjusted_ranking(ranking, participants)
-#         score = get_score_from_ranking(ranking)
-#
-#     return np.dot(score, total_weights) / np.sum(total_weights)
-#
-#
-# def get_weighted_delta_rating(
-#     time_relevancy,
-#     track_relevancy,
-#     race_difficulty,
-#     rating_hist,
-#     current_rating,
-#     time_weight=0.3,
-#     track_weight=0.2,
-#     difficulty_weight=0.5,
-# ):
-#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-#
-#     n = rating_hist.shape[0]
-#     rating_diff = np.zeros(n, dtype=np.float64)
-#     rating_diff[:n - 1] = np.diff(rating_hist)
-#     rating_diff[n - 1] = current_rating - rating_hist[-1]
-#
-#     total_weights = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-#     return np.dot(total_weights, rating_diff) / np.sum(total_weights)
-#
-#
-# def get_weighted_beaten_length(
-#     time_relevancy,
-#     track_relevancy,
-#     race_difficulty,
-#     beaten_length,
-#     time_weight=0.3,
-#     track_weight=0.2,
-#     difficulty_weight=0.5,
-# ):
-#     time_weight, track_weight, difficulty_weight = normalize_weights(time_weight, track_weight, difficulty_weight)
-#     total_weight = time_weight * time_relevancy + track_weight * track_relevancy + difficulty_weight * race_difficulty
-#
-#     return np.dot(total_weight, beaten_length) / np.sum(total_weight)
 
