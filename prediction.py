@@ -1,0 +1,157 @@
+import torch
+
+from collect_data import DataCollector
+from scraper import Scraper
+from database import fetch, store, init_engine, Participation, Race
+from scraper.generate_url import generate_upcoming_race_url
+from scraper.utils import extract_jockey_trainer_id_from_url
+from final_dataloader import FinalDataLoader
+
+from datetime import datetime
+from utils.config import device
+from tqdm import tqdm
+
+from final_model_analysis import get_overall_mean_std, load_data
+from final_models import PWRankingScore
+
+from tabulate import tabulate
+
+
+def build_upcoming_url(date, location, num):
+    return f"https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?RaceDate={date.strftime("%Y/%m/%d")}&Racecourse={location}&RaceNo={num}".lower()
+
+
+def get_date_location_max_num():
+    date = input("Date: ")
+    location = input("Location: ")
+    max_num = int(input("Max number: "))
+
+    return datetime.strptime(date, "%Y/%m/%d"), location, max_num
+
+
+def scrape_one_upcoming_race(data_collector: DataCollector, url):
+    fetch_api = data_collector.fetch
+    scraper = data_collector.scraper
+
+    race_data = scraper.scrape_one_upcoming_race(url)
+
+    for ps in race_data:
+        horse_url = ps["horse_url"]
+        jockey_url = ps["jockey_url"]
+        trainer_url = ps["trainer_url"]
+
+        jockey_id = extract_jockey_trainer_id_from_url(jockey_url)
+        trainer_id = extract_jockey_trainer_id_from_url(trainer_url)
+
+        if not fetch_api.fetch_horse.exist(url=horse_url):
+            data_collector.get_horse(horse_url)
+
+        if not fetch_api.fetch_jockey.exist(id=jockey_id):
+            data_collector.get_jockey(jockey_url)
+            jockey_id = fetch_api.fetch_jockey.one(url=jockey_url).id
+
+        if not fetch_api.fetch_trainer.exist(id=trainer_id):
+            data_collector.get_trainer(trainer_url)
+            trainer_id = fetch_api.fetch_trainer.one(url=trainer_url).id
+
+        horse_id = fetch_api.fetch_horse.one(url=horse_url).id
+
+        ps.update({"horse_id": horse_id, "jockey_id": jockey_id, "trainer_id": trainer_id})
+
+    return race_data
+
+
+def group_into_participation(data):
+    race = Race(
+        date = data["date"],
+        distance = data["distance"],
+        course = data["course"],
+        location = data["location"]
+    )
+    participation = Participation(
+        horse_id = data["horse_id"],
+        jockey_id = data["jockey_id"],
+        number = data["number"],
+        lane = data["lane"],
+        rating = data["rating"],
+        gear_weight = data["gear_weight"],
+        horse_weight = data["horse_weight"],
+    )
+    participation.race = race
+
+    return participation
+
+
+def filter_inexperienced(fetch_api, ps):
+    result = []
+    result_nums = []
+
+    for p in ps:
+        horse_id = p["horse_id"]
+        ps = fetch_api.fetch_participation(horse_id=horse_id)
+        filtered = [p for p in ps if p.finish_time is not None]
+        if len(filtered) == 0:
+            continue
+        result.append(p)
+        result_nums.append(p["number"])
+
+    return result, result_nums
+
+
+def predict_one_race(model, url, data_collector, dataloader, mean, std):
+    fetch_api = data_collector.fetch
+    result = scrape_one_upcoming_race(data_collector, url)
+    result, result_nums = filter_inexperienced(fetch_api, result)
+    data_x = torch.zeros((len(result), 64), dtype=torch.float64, device=device)
+    counter = 0
+    for result_p in tqdm(result, desc="Loading data"):
+        this_p = group_into_participation(result_p)
+        this_x = dataloader.load_p(this_p, result_p["trainer_id"])
+        this_x = torch.tensor(this_x, device=device, dtype=torch.float64)
+        data_x[counter] = this_x
+        counter += 1
+
+    mean = torch.tensor(mean, dtype=torch.float64, device=device)
+    std = torch.tensor(std, dtype=torch.float64, device=device)
+
+    normalized_x = (data_x - mean) / std
+
+    model.eval()
+    pred = model(normalized_x)
+    pred = pred.flatten().tolist()
+    corresponding = list(zip(result_nums, pred))
+    corresponding.sort(key=lambda x: x[1], reverse=True)
+
+    corresponding = [(f"{n}", f"{s:.4f}") for (n, s) in corresponding]
+
+    return corresponding
+
+
+def main():
+    init_engine()
+    scraper = Scraper()
+    fetch_api = fetch.Fetch()
+    store_api = store.Store()
+    data_collector = DataCollector(scraper, fetch_api, store_api)
+
+    model = PWRankingScore().to(device).double()
+    model_params = torch.load("final_trained_models/Ranking_Score.pth")
+    model.load_state_dict(model_params)
+
+    all_data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
+    mean, std = get_overall_mean_std(all_data_x)
+
+    dataloader = FinalDataLoader()
+    dataloader.setup()
+
+    date, location, max_num = get_date_location_max_num()
+
+    for num in range(max_num):
+        url = build_upcoming_url(date, location, num + 1)
+        corresponding = predict_one_race(model, url, data_collector, dataloader, mean, std)
+        print(f"Race {num + 1}")
+        print(tabulate(corresponding, headers = ["Horse num", "Score"], tablefmt = "psql"))
+
+
+if __name__ == '__main__':
+    main()

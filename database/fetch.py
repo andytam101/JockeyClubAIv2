@@ -4,7 +4,7 @@ Provides an API for fetching loaded_data from the database
 
 from contextlib import contextmanager
 
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
 from . import get_session, Winnings
 from ._horse import Horse
@@ -54,6 +54,8 @@ class _FetchDB:
             self.one(**kwargs)
         except ValueError:
             return False
+        except MultipleResultsFound:
+            return True
         return True
 
     def filter(self, **kwargs):

@@ -170,7 +170,7 @@ class FinalDataLoader:
                 this_y[i, 3] = p.win_odds
                 this_y[i, 4] = participants
 
-                this_x[i] = self.load_p(p)
+                this_x[i] = self.load_p(p, p.horse.trainer_id)
 
                 if p_ranking == 1:
                     this_winners.append(p.number)
@@ -260,13 +260,13 @@ class FinalDataLoader:
         else:
             return np.std(variable)
 
-    def load_p(self, p):
-        trainer = p.horse.trainer
+    def load_p(self, p, trainer_id):
+        trainer = self.session.query(Trainer).filter(Trainer.id == trainer_id).one()
 
         old_horse_ps = self.get_old_horse_ps(p.horse_id, p.race.date)
         old_jockey_ps = self.get_old_jockey_ps(p.jockey_id, p.race.date)[-50:]
-        old_trainer_ps = self.get_old_trainer_ps(p.horse.trainer_id, p.race.date)[-300:]
-        old_jt_combo_ps = self.get_old_jt_combo_ps(p.jockey_id, p.horse.trainer_id, p.race.date)
+        old_trainer_ps = self.get_old_trainer_ps(trainer_id, p.race.date)[-300:]
+        old_jt_combo_ps = self.get_old_jt_combo_ps(p.jockey_id, trainer_id, p.race.date)
 
         previous_horse_p = old_horse_ps[-1]
         previous_jockey_p = old_jockey_ps[-1]

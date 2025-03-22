@@ -460,10 +460,18 @@ class Scraper:
         date = datetime(int(year), datetime.strptime(month, "%B").month, int(day)).date()
 
         racing_info = race_info[2].split(", ")
-        track = " ".join(racing_info[:-3])
-        distance = racing_info[-2]
-        condition = racing_info[-1]
+
+        # get distance index
+        distance_value = list(filter(lambda x: x[-1] == 'M', racing_info))[0]
+        distance_idx = racing_info.index(distance_value)
+
+        course = " ".join(racing_info[:distance_idx])
+        distance = racing_info[distance_idx]
         distance = int(distance[:-1])
+        try:
+            condition = racing_info[distance_idx + 1]
+        except IndexError:
+            condition = None
 
         prize_class_info = race_info[3].split(", ")
         total_bet = prize_class_info[0].split(": ")[1][1:].replace(",", "")
@@ -472,7 +480,7 @@ class Scraper:
         p_table = body.find_element(By.CLASS_NAME, "draggable").find_element(By.TAG_NAME, "tbody")
         p_rows = p_table.find_elements(By.TAG_NAME, "tr")
         for row in p_rows:
-            this_p = {"date": date, "location": location, "track": track, "distance": distance,
+            this_p = {"date": date, "location": location, "course": course, "distance": distance,
                       "condition": condition,
                       "total_bet": total_bet, "race_class": race_class}
 

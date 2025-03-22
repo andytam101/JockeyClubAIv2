@@ -93,9 +93,9 @@ def display_cumulative_table(counter_map):
 
 def main():
     model = load_model(PWRankingScore, "final_trained_models/Ranking_Score.pth")
-    data_x, _, _, _, _ = load_data("distance_1600/weighed/train")
+    data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
     mean, std = get_overall_mean_std(data_x)
-    test_x, test_y, test_h_nums, _, _ = load_data("combined/weighed/test")
+    test_x, test_y, test_h_nums, _, _ = load_data("final_loaded_data/combined/weighed/test")
 
     # what ranking actual winner was predicted as
     # key: predicted rank, value: count
