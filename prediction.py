@@ -1,5 +1,7 @@
 import torch
 
+from argparse import ArgumentParser
+
 from collect_data import DataCollector
 from scraper import Scraper
 from database import fetch, store, init_engine, Participation, Race
@@ -12,7 +14,7 @@ from utils.config import device
 from tqdm import tqdm
 
 from final_model_analysis import get_overall_mean_std, load_data
-from final_models import PWRankingScore
+from final_models import PWRankingScore, PWRelativeRanking, PWWinnerBinary, PWPlaceBinary
 
 from tabulate import tabulate
 
@@ -27,6 +29,13 @@ def get_date_location_max_num():
     max_num = int(input("Max number: "))
 
     return datetime.strptime(date, "%Y/%m/%d"), location, max_num
+
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("model", type=str)
+
+    return parser.parse_args()
 
 
 def scrape_one_upcoming_race(data_collector: DataCollector, url):
@@ -127,16 +136,38 @@ def predict_one_race(model, url, data_collector, dataloader, mean, std):
     return corresponding
 
 
+def get_model(name):
+    match name:
+        case "PWRScore":
+            model = PWRankingScore()
+            model_params = torch.load("final_trained_models/Ranking_Score.pth")
+        case "PWRanking":
+            model = PWRelativeRanking()
+            model_params = torch.load("final_trained_models/Relative_Ranking.pth")
+        case "PWWinBin":
+            model = PWWinnerBinary()
+            model_params = torch.load("final_trained_models/Winner_Binary.pth")
+        case "PWPlaceBin":
+            model = PWPlaceBinary()
+            model_params = torch.load("final_trained_models/Place_Binary.pth")
+        case _:
+            raise Exception(f"Unknown model: {name}")
+
+    model.to(device).double()
+    model.load_state_dict(model_params)
+
+    return model
+
 def main():
+    args = parse_args()
+
     init_engine()
     scraper = Scraper()
     fetch_api = fetch.Fetch()
     store_api = store.Store()
     data_collector = DataCollector(scraper, fetch_api, store_api)
 
-    model = PWRankingScore().to(device).double()
-    model_params = torch.load("final_trained_models/Ranking_Score.pth")
-    model.load_state_dict(model_params)
+    model = get_model(args.model)
 
     all_data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
