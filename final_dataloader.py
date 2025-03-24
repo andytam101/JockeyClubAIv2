@@ -625,8 +625,8 @@ def get_track_width(race: Race):
         "C+3": 19.5,
     }
 
-    if course == "ALL WEATHER TRACK":
-        return sha_tin_track_width[course]
+    if course.upper() == "ALL WEATHER TRACK":
+        return sha_tin_track_width[course.upper()]
 
     letter = course.split('"')[1]  # get middle element
     if location == "Sha Tin":
