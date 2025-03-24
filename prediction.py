@@ -140,16 +140,16 @@ def get_model(name):
     match name:
         case "PWRScore":
             model = PWRankingScore()
-            model_params = torch.load("final_trained_models/Ranking_Score.pth")
+            model_params = torch.load("final_trained_models/Ranking_Score.pth", map_location=device)
         case "PWRanking":
             model = PWRelativeRanking()
-            model_params = torch.load("final_trained_models/Relative_Ranking.pth")
+            model_params = torch.load("final_trained_models/Relative_Ranking.pth", map_location=device)
         case "PWWinBin":
             model = PWWinnerBinary()
-            model_params = torch.load("final_trained_models/Winner_Binary.pth")
+            model_params = torch.load("final_trained_models/Winner_Binary.pth", map_location=device)
         case "PWPlaceBin":
             model = PWPlaceBinary()
-            model_params = torch.load("final_trained_models/Place_Binary.pth")
+            model_params = torch.load("final_trained_models/Place_Binary.pth", map_location=device)
         case _:
             raise Exception(f"Unknown model: {name}")
 
