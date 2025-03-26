@@ -107,13 +107,16 @@ def filter_inexperienced(fetch_api, ps):
     return result, result_nums
 
 
-def predict_one_race(model, url, data_collector, dataloader, mean, std):
+def predict_one_race(model, url, data_collector, dataloader, mean, std, display=True):
     fetch_api = data_collector.fetch
     result = scrape_one_upcoming_race(data_collector, url)
     result, result_nums = filter_inexperienced(fetch_api, result)
     data_x = torch.zeros((len(result), 64), dtype=torch.float64, device=device)
     counter = 0
-    for result_p in tqdm(result, desc="Loading data"):
+
+    iterator = result if not display else tqdm(result, desc="Loading data")
+
+    for result_p in iterator:
         this_p = group_into_participation(result_p)
         this_x = dataloader.load_p(this_p, result_p["trainer_id"])
         this_x = torch.tensor(this_x, device=device, dtype=torch.float64)
@@ -129,7 +132,7 @@ def predict_one_race(model, url, data_collector, dataloader, mean, std):
     pred = model(normalized_x)
     pred = pred.flatten().tolist()
     corresponding = list(zip(result_nums, pred))
-    corresponding.sort(key=lambda x: x[1], reverse=True)
+    corresponding.sort(key=lambda x: x[1], reverse=not model.reverse_points)
 
     corresponding = [(f"{n}", f"{s:.4f}") for (n, s) in corresponding]
 
@@ -150,6 +153,8 @@ def get_model(name):
         case "PWPlaceBin":
             model = PWPlaceBinary()
             model_params = torch.load("final_trained_models/Place_Binary.pth", map_location=device)
+        case "all":
+            return None
         case _:
             raise Exception(f"Unknown model: {name}")
 
@@ -160,28 +165,46 @@ def get_model(name):
 
 def main():
     args = parse_args()
+    model = get_model(args.model)
+    
+    date, location, max_num = get_date_location_max_num()
 
     init_engine()
     scraper = Scraper()
     fetch_api = fetch.Fetch()
     store_api = store.Store()
     data_collector = DataCollector(scraper, fetch_api, store_api)
-
-    model = get_model(args.model)
-
     all_data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
-
     dataloader = FinalDataLoader()
     dataloader.setup()
-
-    date, location, max_num = get_date_location_max_num()
-
+    
     for num in range(max_num):
         url = build_upcoming_url(date, location, num + 1)
-        corresponding = predict_one_race(model, url, data_collector, dataloader, mean, std)
-        print(f"Race {num + 1}")
-        print(tabulate(corresponding, headers = ["Horse num", "Score"], tablefmt = "psql"))
+        if model is not None:
+            corresponding = predict_one_race(model, url, data_collector, dataloader, mean, std, display=True)
+            print(f"Race {num + 1}")
+            print(tabulate(corresponding, headers = ["Horse num", "Score"], tablefmt = "psql"))
+        else:
+            final_table = []
+            print(f"Race {num + 1}")
+            for loop_model in ALL_MODELS:
+                corresponding = predict_one_race(loop_model, url, data_collector, dataloader, mean, std, display=False)                
+                for idx, row in enumerate(corresponding):
+                    if len(final_table) <= idx:
+                        final_table.append([])
+                    final_table[idx].append(row[0])
+                    final_table[idx].append(row[1])
+
+            print(tabulate(final_table, headers = ["Num", "RScore", "Num", "WBin", "Num", "PBin", "Num", "Ranking"], tablefmt="psql"))
+            
+
+ALL_MODELS = [
+    get_model("PWRScore"),
+    get_model("PWWinBin"),
+    get_model("PWPlaceBin"),
+    get_model("PWRanking")
+]
 
 
 if __name__ == '__main__':
