@@ -177,6 +177,9 @@ def main():
     all_data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
     dataloader = FinalDataLoader()
+
+    dataloader.scale_data = False
+
     dataloader.setup()
     
     for num in range(max_num):
