@@ -143,16 +143,16 @@ def get_model(name):
     match name:
         case "PWRScore":
             model = PWRankingScore()
-            model_params = torch.load("final_trained_models/Ranking_Score.pth", map_location=device)
+            model_params = torch.load("final_trained_models/Ranking_Score.pth", map_location=device, weights_only=True)
         case "PWRanking":
             model = PWRelativeRanking()
-            model_params = torch.load("final_trained_models/Relative_Ranking.pth", map_location=device)
+            model_params = torch.load("final_trained_models/Relative_Ranking.pth", map_location=device, weights_only=True)
         case "PWWinBin":
             model = PWWinnerBinary()
-            model_params = torch.load("final_trained_models/Winner_Binary.pth", map_location=device)
+            model_params = torch.load("final_trained_models/Winner_Binary.pth", map_location=device, weights_only=True)
         case "PWPlaceBin":
             model = PWPlaceBinary()
-            model_params = torch.load("final_trained_models/Place_Binary.pth", map_location=device)
+            model_params = torch.load("final_trained_models/Place_Binary.pth", map_location=device, weights_only=True)
         case "all":
             return None
         case _:
