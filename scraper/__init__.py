@@ -477,8 +477,15 @@ class Scraper:
         total_bet = prize_class_info[0].split(": ")[1][1:].replace(",", "")
         race_class = convert_race_class(prize_class_info[2])
 
-        p_table = body.find_element(By.CLASS_NAME, "draggable").find_element(By.TAG_NAME, "tbody")
-        p_rows = p_table.find_elements(By.TAG_NAME, "tr")
+        p_table = body.find_element(By.CLASS_NAME, "draggable")
+        p_headers = p_table.find_element(By.TAG_NAME, "thead").find_element(By.TAG_NAME, "tr")
+
+        p_header_cols = p_headers.find_elements(By.TAG_NAME, "td")
+        p_header_cols = [x.text for x in p_header_cols if x.text != "" and x.text != "Colour"]
+
+        rating_idx = p_header_cols.index("Rtg.")
+
+        p_rows = p_table.find_element(By.TAG_NAME, "tbody").find_elements(By.TAG_NAME, "tr")
         for row in p_rows:
             this_p = {"date": date, "location": location, "course": course, "distance": distance,
                       "condition": condition,
@@ -497,7 +504,8 @@ class Scraper:
             jockey = cells[4]
             lane = int(cells[5].text)
             trainer = cells[6]
-            rating = int(cells[7].text)
+
+            rating = int(cells[rating_idx].text)
             horse_weight = int(cells[9].text)
 
             this_p["number"] = number
