@@ -505,6 +505,14 @@ class Scraper:
             lane = int(cells[5].text)
             trainer = cells[6]
 
+            if '-' in jockey.text:
+                # extract lowered weight
+                reduced_weight = jockey.text.split("(")[1][:-1]     # remove closing bracket
+                reduced_weight = int(reduced_weight)
+
+                # reduced_weight is negative
+                gear_weight += reduced_weight
+
             rating = int(cells[rating_idx].text)
             horse_weight = int(cells[9].text)
 
