@@ -7,10 +7,16 @@ from tqdm import tqdm
 from final_models import PWRankingScore, PWRankingScore, PWPlaceBinary, PWRelativeRanking, PWWinnerBinary
 
 
+from database import init_engine, get_session, Race
+
+
+from utils.config import device
+
+
 def load_model(f, path):
     model = f()
-    model.to("cuda").double()
-    model.load_state_dict(torch.load(path))
+    model.to(device).double()
+    model.load_state_dict(torch.load(path, weights_only=True, map_location=device))
     return model
 
 
@@ -46,7 +52,7 @@ def get_overall_mean_std(data_x):
 def get_sorted_prediction(model, race_x, horse_nums, mean, std):
     model.eval()
     with torch.no_grad():
-        normalized_x = torch.tensor((race_x - mean) / std, dtype=torch.float64, device="cuda")
+        normalized_x = torch.tensor((race_x - mean) / std, dtype=torch.float64, device=device)
         predictions = model(normalized_x)
         predictions = predictions.tolist()
 
@@ -102,7 +108,15 @@ def main():
     counter_predicted_ranking = {}
     counter_actual_ranking = {}
 
+    init_engine()
+
+    session = get_session()
+
     for race_id in tqdm(test_x, desc="Analysing"):
+
+        if session.query(Race).filter(Race.id == race_id).one().location != "Sha Tin":
+            continue
+
         sorted_prediction = get_sorted_prediction(model, test_x[race_id], test_h_nums[race_id], mean, std)
         actual_result = get_actual_result(test_y[race_id], test_h_nums[race_id])
 
