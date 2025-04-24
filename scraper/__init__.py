@@ -513,7 +513,11 @@ class Scraper:
                 # reduced_weight is negative
                 gear_weight += reduced_weight
 
-            rating = int(cells[rating_idx].text)
+            rating = cells[rating_idx].text
+            if rating == "-":
+                rating = None
+            else:
+                rating = int(rating)
             horse_weight = int(cells[9].text)
 
             this_p["number"] = number
