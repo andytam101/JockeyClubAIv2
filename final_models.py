@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -5,11 +7,16 @@ import torch.optim as optim
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+from sqlalchemy.orm.base import state_str
 from tqdm import tqdm
 import copy
 import os
 
 from final_dataloader import is_place
+from utils.config import device
+
+
+ODDS_ANOMALY_THRESHOLD = np.inf
 
 
 class KFoldTrainer:
@@ -26,8 +33,17 @@ class KFoldTrainer:
         self.mean_stds = []
         self.cv_costs = []
 
-    def fold_data(self, data_keys):
-        data_keys_list = list(data_keys)
+    def fold_data(self, data_y):
+        anomaly_count = 0
+        data_keys_list = []
+        for key in data_y:
+            race_y = data_y[key]
+            winner_idx = torch.argmin(race_y[:, 0])
+            if race_y[winner_idx, 3] < ODDS_ANOMALY_THRESHOLD:
+                data_keys_list.append(key)
+            else:
+                anomaly_count += 1
+
         random.shuffle(data_keys_list)
 
         n = len(data_keys_list)
@@ -35,9 +51,11 @@ class KFoldTrainer:
         for i in range(0, n, step_count):
             self.folds.append(data_keys_list[i:i + step_count])
 
+        print(f"Removed {anomaly_count}/{n + anomaly_count} anomalies")
+
     def train_model(self, batch_size=1024, max_epoch=200, overfitting_threshold=3, display=True):
         data_x = self.data["data_x"]
-        self.fold_data(data_x.keys())
+        self.fold_data(self.data["data_y"])
 
         for number in range(self.k_folds):
             self.model = self.model_factory()
@@ -293,7 +311,7 @@ class KFoldTrainer:
             horse_predictions = list(zip(horse_nums, result_vector.tolist()))
         else:
             horse_predictions = list(zip(horse_nums, predictions.tolist()))
-        horse_predictions.sort(key=lambda x: x[1], reverse=(not model.reverse_pointsreverse_points))
+        horse_predictions.sort(key=lambda x: x[1], reverse=(not model.reverse_points))
 
         return horse_predictions[0][0], horse_predictions[1][0]
 
@@ -337,7 +355,7 @@ def load_data(train_directory, *test_directories):
 
 
 def default_factory(f):
-    return lambda: f().to("cuda").double()
+    return lambda: f().to(device).double()
 
 
 def model_ability(win_count, total_count, test_win_count, test_total_count):
@@ -349,13 +367,28 @@ def model_ability(win_count, total_count, test_win_count, test_total_count):
     return win_acc + test_acc - diff_sq
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("train_dir", type=str)
+    parser.add_argument("test_dir", type=str)
+    parser.add_argument("save_dir", type=str)
+
+    return parser.parse_args()
+
+
 def main():
-    data, results = load_data("distance_1600/weighed", "distance_1400/weighed", "distance_1600/weighed", "distance_2000/weighed", "distance_1200/weighed")
-    all_model_factories = map(default_factory, [PairSScoreDiff, PairRScoreDiff])
+    args = parse_args()
+    train_dir = args.train_dir
+    test_dir = args.test_dir
+    directory = args.save_dir
+
+    data, results = load_data(
+        train_dir, test_dir,
+    )
+    all_model_factories = map(default_factory, [PWWinnerBinary, PWPlaceBinary, PWRankingScore, PWRelativeRanking])
     all_model_factories = list(all_model_factories)
 
     iterations = 1
-    directory = "final_trained_models"
     os.makedirs(directory, exist_ok=True)
 
     for model_factory in all_model_factories:
@@ -382,14 +415,6 @@ def main():
         display_accuracy("Test data", test_acc)
 
         torch.save(best_acc_model, f"{directory}/{"_".join(trainer.model.name.split(" "))}.pth")
-
-
-def get_train_cv_split(data_keys, cv_ratio=0.1):
-    m = len(data_keys)
-    train_size = round(m * (1 - cv_ratio))
-    train_keys = set(random.sample(data_keys, train_size))
-    cv_keys = set(data_keys) - set(train_keys)
-    return list(train_keys), list(cv_keys)
 
 
 def display_accuracy(header, accuracy):
@@ -470,7 +495,7 @@ class PWRelativeRanking(nn.Module):
 
     @staticmethod
     def format_y(y):
-        return ((y[:, 0] - 1) / (y[:, 4] - 1)).double().unsqueeze(1)
+        return (1 - (y[:, 0] - 1) / (y[:, 4] - 1)).double().unsqueeze(1)
 
 
 class PWRankingScore(nn.Module):
@@ -561,6 +586,38 @@ class PWPlaceBinary(nn.Module):
     @staticmethod
     def format_y(y):
         return is_place(y[:, 0], y[:, 4]).double().unsqueeze(1)
+
+
+class PWOddsAdjustedScore(nn.Module):
+    def __init__(self):
+        super(PWOddsAdjustedScore, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(64, 8),
+            nn.ReLU(),
+            nn.Linear(8, 1),
+        )
+
+        self.name = "Odds Adjusted Score"
+
+        self.pairwise = False
+        self.reverse_points = False
+        self.normalise_by_race = False
+
+    def forward(self, x):
+        return self.model(x)
+
+    def optimizer(self):
+        return optim.SGD(self.parameters(), lr=0.001, weight_decay=0.0005, momentum=0.9)
+
+    @staticmethod
+    def criterion():
+        return nn.MSELoss()
+
+    @staticmethod
+    def format_y(y):
+        win_result = (y[:,0] == 1) * torch.log(y[:, 3])
+        place_result = (is_place(y[:, 0], y[:, 4]).double()) * torch.log(1 + ((y[:, 3] - 1) / 3))   # estimate place odds by dividing by 3
+        return place_result.double().unsqueeze(1)
 
 
 class PairBinary(nn.Module):
