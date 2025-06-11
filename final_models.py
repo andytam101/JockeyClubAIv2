@@ -478,7 +478,7 @@ class PWRelativeRanking(nn.Module):
         )
 
         self.pairwise = False
-        self.reverse_points = True
+        self.reverse_points = False
         self.normalise_by_race = False
 
         self.name = "Relative Ranking"

@@ -174,7 +174,7 @@ def main():
     fetch_api = fetch.Fetch()
     store_api = store.Store()
     data_collector = DataCollector(scraper, fetch_api, store_api)
-    all_data_x, _, _, _, _ = load_data("final_loaded_data/distance_1600/weighed/train")
+    all_data_x, _, _, _, _ = load_data("final_loaded_data/location_ST_1600/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
     dataloader = FinalDataLoader()
 

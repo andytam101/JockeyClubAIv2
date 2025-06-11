@@ -22,6 +22,7 @@ test.*
 loaded_data/
 *.npy
 *.npz
+*.pt
 
 # miscellaneous data files
 *.txt

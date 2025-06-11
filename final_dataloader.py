@@ -1,4 +1,6 @@
 # 64 PERFECT FEATURES - NO TURNING BACK. LAST FILE ON DATA LOADING.
+import argparse
+
 import numpy as np
 
 from database import Race, Participation, Horse, Trainer, init_engine, get_session
@@ -13,7 +15,6 @@ from tqdm import tqdm
 from datetime import datetime
 import os
 import json
-
 
 
 class FinalDataLoader:
@@ -113,10 +114,10 @@ class FinalDataLoader:
         log_mean, log_std = self.log_win_odds_mean_std[number]
         return 1 - lognorm.cdf(raw_win_odds, log_std, scale=np.exp(log_mean))
 
-    def extract_races(self, start_date, end_date, distance):
-        races = self.get_query().filter(Race.date >= start_date).filter(Race.date < end_date)
-        if distance is not None:
-            races = races.filter(Race.distance == distance)
+    def extract_races(self, start_date, end_date, location, distance):
+        races = (self.get_query().filter(Race.date >= start_date).filter(Race.date < end_date)
+                 .filter(Race.location == location)
+                 .filter(Race.distance == distance))
         races = races.all()
         return races
 
@@ -135,9 +136,10 @@ class FinalDataLoader:
         self,
         start_date,
         end_date,
+        location,
         distance,
     ):
-        races = self.extract_races(start_date, end_date, distance)
+        races = self.extract_races(start_date, end_date, location, distance)
         size = self.size
 
         all_x = {}
@@ -724,38 +726,38 @@ def save_data(directory, all_x, all_y, horse_nums, wins, places):
     np.savez(f"{directory}/places.npz", **places)
 
 
-def load_all_for_distance(dataloader: FinalDataLoader, distance, directory):
+def load_all_for_location_distance(dataloader: FinalDataLoader, location, distance, directory):
     # both
-    dataloader.scale_data = True
-    dataloader.weigh_data = True
-    both_path = os.path.join(directory, "both")
-    load_train_test_data(dataloader, both_path, distance)
-
-    # scaled
-    dataloader.weigh_data = False
-    scaled_path = os.path.join(directory, "scaled")
-    load_train_test_data(dataloader, scaled_path, distance)
+    # dataloader.scale_data = True
+    # dataloader.weigh_data = True
+    # both_path = os.path.join(directory, "both")
+    # load_train_test_data(dataloader, both_path, location)
+    #
+    # # scaled
+    # dataloader.weigh_data = False
+    # scaled_path = os.path.join(directory, "scaled")
+    # load_train_test_data(dataloader, scaled_path, location)
 
     # weighed
     dataloader.weigh_data = True
     dataloader.scale_data = False
     weighed_path = os.path.join(directory, "weighed")
-    load_train_test_data(dataloader, weighed_path, distance)
+    load_train_test_data(dataloader, weighed_path, location, distance)
 
     # neither
-    dataloader.weigh_data = False
-    neither_path = os.path.join(directory, "neither")
-    load_train_test_data(dataloader, neither_path, distance)
+    # dataloader.weigh_data = False
+    # neither_path = os.path.join(directory, "neither")
+    # load_train_test_data(dataloader, neither_path, location)
 
 
-def load_train_test_data(dataloader, directory, distance):
+def load_train_test_data(dataloader, directory, location, distance):
     train_start_date = datetime(2012, 9, 1).date()
     train_end_date = datetime(2022, 9, 1).date()
     test_start_date = datetime(2022, 9, 1).date()
     test_end_date = datetime(2025, 9, 1).date()
 
-    train_x, train_y, horse_nums, wins, places = dataloader.load_data(train_start_date, train_end_date, distance)
-    test_x, test_y, test_horse_nums, test_wins, test_places = dataloader.load_data(test_start_date, test_end_date, distance)
+    train_x, train_y, horse_nums, wins, places = dataloader.load_data(train_start_date, train_end_date, location, distance)
+    test_x, test_y, test_horse_nums, test_wins, test_places = dataloader.load_data(test_start_date, test_end_date, location, distance)
 
     train_dir = os.path.join(directory, "train")
     test_dir = os.path.join(directory, "test")
@@ -764,20 +766,33 @@ def load_train_test_data(dataloader, directory, distance):
     save_data(test_dir, test_x, test_y, test_horse_nums, test_wins, test_places)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--distance", type=int, required=True)
+    parser.add_argument("-l", "--location", type=str, required=True)
+
+    return parser.parse_args()
+
+
 def main():
+
+    args = parse_args()
+    distance = args.distance
+    location = args.location
+
+    if location == "Sha Tin":
+        loc_short = "ST"
+    elif location == "Happy Valley":
+        loc_short = "HV"
+    else:
+        raise ValueError(f"Unknown location {location}")
+
     init_engine()
     dataloader = FinalDataLoader()
 
     dataloader.setup()
 
-    distances = [None, 1000, 1200, 1400, 1600, 1650, 1800, 2000, 2200, 2400]
-    distances_path = ["combined"] + [f"distance_{d}" for d in distances[1:]]
-
-    for i in range(len(distances)):
-        this_distance = distances[i]
-        this_path = distances_path[i]
-
-        load_all_for_distance(dataloader, this_distance, this_path)
+    load_all_for_location_distance(dataloader, location, distance,f"final_loaded_data/location_{loc_short}_{distance}")
 
 
 if __name__ == "__main__":
