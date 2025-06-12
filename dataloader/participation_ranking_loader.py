@@ -340,8 +340,8 @@ class ParticipationRankingLoader(Loader):
         entry[9] = num_days_horse
         entry[10] = num_days_jockey
 
-        entry[11:55] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(horse_ps), dtype=np.float32))
-        entry[55:99] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(jockey_ps), dtype=np.float32))
-        entry[99:143] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(trainer_ps), dtype=np.float32))
+        entry[11:33] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(horse_ps), dtype=np.float32))
+        entry[33:55] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(jockey_ps), dtype=np.float32))
+        entry[55:77] = np.nan_to_num(np.array(ParticipationRankingLoader.get_grouped_stats(trainer_ps), dtype=np.float32))
 
         return entry

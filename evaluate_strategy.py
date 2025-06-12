@@ -225,7 +225,7 @@ def main():
     warnings.filterwarnings("ignore", category=FutureWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    model_dir = "trained_models/PRL_nn_epoch_10000"
+    model_dir = "old_models"
     strategies = [
         RandomWinnerStrategy(),
         HighPWinnerStrategy(model_dir=model_dir, threshold=1.1, count=1),
