@@ -7,7 +7,7 @@ import torch.optim as optim
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-from sqlalchemy.orm.base import state_str
+import json
 from tqdm import tqdm
 import copy
 import os
@@ -415,6 +415,32 @@ def main():
         display_accuracy("Test data", test_acc)
 
         torch.save(best_acc_model, f"{directory}/{"_".join(trainer.model.name.split(" "))}.pth")
+
+        if train_acc[3] > 0:
+            train_accuracy = {
+                "win": train_acc[0] / train_acc[3],
+                "place": train_acc[1] / train_acc[3],
+                "q_place": train_acc[2] / train_acc[3]
+            }
+        else:
+            train_accuracy = {}
+
+        if test_acc[3] > 0:
+            test_accuracy = {
+                "win": test_acc[0] / test_acc[3],
+                "place": test_acc[1] / test_acc[3],
+                "q_place": test_acc[2] / test_acc[3]
+            }
+        else:
+            test_accuracy = {}
+
+        accuracy_data = {
+            "train_acc": train_accuracy,
+            "test_acc": test_accuracy,
+        }
+
+        with open(f"{directory}/{"_".join(trainer.model.name.split(" "))}.json", "w") as f:
+            json.dump(accuracy_data, f, indent=4)
 
 
 def display_accuracy(header, accuracy):

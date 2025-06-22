@@ -69,33 +69,31 @@ def extract_group_result(data_y, k=4):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("data_path")
-    parser.add_argument("model_path")
-    parser.add_argument("output_path")
+    parser.add_argument("path_name")
 
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    data_path = args.data_path
-    model_path = args.model_path
-    output_path = args.output_path
+    path_name = args.path_name
+
+    data_path = f"final_loaded_data/{path_name}/weighed"
+    model_path = f"final_trained_models/{path_name}"
+    output_path = f"final_grouped_outputs/{path_name}"
 
     data_x = np.load(os.path.join(data_path, "train/data_x.npz"))
-    # data_y = np.load(os.path.join(data_path, "train/data_y.npz"))
-    # horse_nums = np.load("final_loaded_data/location_ST/weighed/train/horse_nums.npz")
+    test_x = np.load(os.path.join(data_path, "test/data_x.npz"))
     model_classes = [PWWinnerBinary, PWPlaceBinary, PWRankingScore, PWRelativeRanking]
     model_paths = list(map(lambda x: os.path.join(model_path, x),
                            ["Winner_Binary.pth", "Place_Binary.pth", "Ranking_Score.pth", "Relative_Ranking.pth"]))
 
     mean, std = get_mean_std(data_x)
     result = build_model_prediction(model_classes, model_paths, data_x, mean, std)
-    # result_y = extract_group_result(data_y)
+    test_result = build_model_prediction(model_classes, model_paths, test_x, mean, std)
     os.makedirs(output_path, exist_ok=True)
     torch.save(result, os.path.join(output_path, "grouped_outputs.pt"))
-    # torch.save(result_y, "final_grouped_outputs/grouped_results.pt")
+    torch.save(test_result, os.path.join(output_path, "test_grouped_outputs.pt"))
 
 
 if __name__ == "__main__":

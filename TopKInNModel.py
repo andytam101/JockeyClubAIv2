@@ -7,6 +7,7 @@ from math import factorial
 from itertools import permutations
 
 from utils.config import device
+from argparse import ArgumentParser
 from tqdm import tqdm
 
 
@@ -91,8 +92,8 @@ class TopKInNModel:
     def __init__(self, n, k, data_paths):
         self.n = n
         self.k = k
-        self.layer_1 = BinaryClassifier(n, n).to(device).double()
-        self.layer_2 = BinaryClassifier(n, 4 * n).to(device).double()
+        self.layer_1 = BinaryClassifier(n, n // 2).to(device).double()
+        self.layer_2 = BinaryClassifier(n, 3 * n).to(device).double()
 
         self.race_outputs = np.load(data_paths.race_outputs)
         self.pw_outputs = torch.load(data_paths.pw_outputs, map_location=device)
@@ -284,6 +285,7 @@ def overall_accuracy(model, horse_nums, wins, race_output, threshold):
     correct = 0
     total = 0
     winnings = 0
+    win_odds_won = []
     for race_id in tqdm(horse_nums.keys()):
         if not model.is_valid_race_id(race_id):
             continue
@@ -297,22 +299,31 @@ def overall_accuracy(model, horse_nums, wins, race_output, threshold):
 
         highest_idx = torch.argmax(expected_values, dim=0)
 
-        if layer_1 < threshold:
+        if expected_values[highest_idx] < threshold:
             continue
 
         pred_winner = this_top_n_horses[highest_idx].item()
         if pred_winner in this_wins:
-            winnings += this_win_odds[highest_idx].item()
+            win_odds = this_win_odds[highest_idx].item()
+            winnings += win_odds
             correct += 1
+            win_odds_won.append(win_odds)
         total += 1
 
     profit = round(winnings - total, 2)
 
-    return correct, total, len(horse_nums), profit
+    return (correct, total, len(horse_nums), profit), win_odds_won
+
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("path_name")
+    return parser.parse_args()
 
 
 def main():
-    path_name = "location_ST_1600"
+    args = parse_args()
+    path_name = args.path_name
 
     data_paths = DataPaths(
         f"final_grouped_outputs/{path_name}/grouped_outputs.pt",
@@ -328,11 +339,13 @@ def main():
     model = TopKInNModel(3, 1, data_paths)
     model.train_models()
 
-    acc = overall_accuracy(model, horse_nums, wins, race_output, threshold=0.55)
+    acc, win_odds_won = overall_accuracy(model, horse_nums, wins, race_output, threshold=1.0)
     print("=" * 100)
     print(f"Overall Accuracy: {acc}")
     if acc[1] > 0:
         print(f"Overall Accuracy: {acc[0] / acc[1]}")
+
+    print(np.mean(win_odds_won))
 
 
 if __name__ == '__main__':

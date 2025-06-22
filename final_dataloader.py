@@ -778,14 +778,14 @@ def main():
 
     args = parse_args()
     distance = args.distance
-    location = args.location
+    loc_short = args.location
 
-    if location == "Sha Tin":
-        loc_short = "ST"
-    elif location == "Happy Valley":
-        loc_short = "HV"
+    if loc_short == "ST":
+        location = "Sha Tin"
+    elif loc_short == "HV":
+        location = "Happy Valley"
     else:
-        raise ValueError(f"Unknown location {location}")
+        raise ValueError(f"Unknown location {loc_short}")
 
     init_engine()
     dataloader = FinalDataLoader()
