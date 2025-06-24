@@ -8,6 +8,10 @@ from itertools import combinations
 from utils.config import device
 from tqdm import tqdm
 
+from argparse import ArgumentParser
+import json
+import os
+
 
 def build_listwise_race_x(race_x, mean, std, n):
     race_x = torch.tensor(race_x, device="cpu")
@@ -94,7 +98,7 @@ def shuffle_indices(m, cv_ratio=0.2):
     return indices[:cv_idx], indices[cv_idx:]
 
 
-def train_model(model, data_x, data_y):
+def train_model(model, data_x, data_y, epochs, weight_decay):
     m = data_x.size(0)
     train_idx, cv_idx = shuffle_indices(m)
     train_x = data_x[train_idx]
@@ -103,8 +107,7 @@ def train_model(model, data_x, data_y):
     cv_y = data_y[cv_idx]
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.001)
-    epochs = 800
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=weight_decay)
 
     for epoch in range(epochs):
         model.train()
@@ -167,12 +170,20 @@ def test_accuracy(model, data_x, data_y, mean, std, n):
     return win, place, total
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("path_name")
+    return parser.parse_args()
+
+
 def main():
-    path_name = "location_ST_1600"
+    args = parse_args()
+    path_name = args.path_name
     n = 4
 
     races_x = np.load(f"final_loaded_data/{path_name}/weighed/train/data_x.npz")
     races_y = np.load(f"final_loaded_data/{path_name}/weighed/train/data_y.npz")
+    print(f"Training on {len(races_x)} number of races")
 
     test_x = np.load(f"final_loaded_data/{path_name}/weighed/test/data_x.npz")
     test_y = np.load(f"final_loaded_data/{path_name}/weighed/test/data_y.npz")
@@ -185,16 +196,39 @@ def main():
     data_y = result_y.to(device).long()
 
     model = ListwiseModel(n).to(device).float()
-    train_model(model, data_x, data_y)
+    train_model(model, data_x, data_y, epochs=1000, weight_decay=0.005)
 
     win, place, total = test_accuracy(model, races_x, races_y, mean, std, n)
     print(f"=========== TRAIN =============")
     print(f"WIN accuracy: {win / total}")
     print(f"PLACE accuracy: {place / total}")
-    win, place, total = test_accuracy(model, test_x, test_y, mean, std, n)
+    test_win, test_place, test_total = test_accuracy(model, test_x, test_y, mean, std, n)
     print(f"============ TEST =============")
-    print(f"WIN accuracy: {win / total}")
-    print(f"PLACE accuracy: {place / total}")
+    print(f"WIN accuracy: {test_win / test_total}")
+    print(f"PLACE accuracy: {test_place / test_total}")
+
+    output_path = os.path.join("final_true_listwise_models", path_name)
+    os.makedirs(output_path, exist_ok=True)
+
+    accuracy = {
+        "train_win": win,
+        "train_place": place,
+        "train_total": total,
+        "train_win_acc": win / total,
+        "train_place_acc": place / total,
+        "test_win": test_win,
+        "test_place": test_place,
+        "test_total": test_total,
+        "test_win_acc": test_win / test_total,
+        "test_place_acc": test_place / test_total,
+    }
+
+    acc_file = os.path.join(output_path, f"accuracy.json")
+    with open(acc_file, "w") as f:
+        json.dump(accuracy, f)
+
+    model_params = model.state_dict()
+    torch.save(model_params, os.path.join(output_path, f"model_params.pth"))
 
 
 if __name__ == "__main__":

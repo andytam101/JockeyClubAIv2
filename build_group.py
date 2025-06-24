@@ -10,28 +10,35 @@ from final_models import PWPlaceBinary, PWWinnerBinary, PWRankingScore, PWRelati
 from tqdm import tqdm
 
 
+def build_one_group(models, race_x, mean, std):
+    this_race = torch.zeros((race_x.shape[0], len(models)), dtype=torch.float32, device=device)
+    counter = 0
+    for model in models:
+        normalised_x = (torch.tensor(race_x, device=device, dtype=torch.float32) - mean) / std
+        output = model(normalised_x).squeeze(-1)
+        this_race[:, counter] = output
+        counter += 1
+    return this_race
+
+
 def build_model_prediction(model_classes, model_paths, data_x, mean, std):
     result = {}
     race_keys = data_x.keys()
-    for race_id in tqdm(race_keys, desc="Building grouped predictions"):
-        this_race = torch.zeros((data_x[race_id].shape[0], len(model_classes)), dtype=torch.float64, device=device)
-        counter = 0
-        for model_class, model_path in zip(model_classes, model_paths):
-            model = model_class().to(device).double()
-            model.load_state_dict(torch.load(model_path, map_location=device))
-            this_x = data_x[race_id]
-            normalised_x = (torch.tensor(this_x, device=device, dtype=torch.float64) - mean) / std
-            output = model(normalised_x).squeeze(-1)
-            this_race[:, counter] = output
-            counter += 1
 
-        result[race_id] = this_race
+    models = []
+    for model_class, model_path in zip(model_classes, model_paths):
+        model = model_class().to(device)
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        models.append(model)
+
+    for race_id in tqdm(race_keys, desc="Building grouped predictions"):
+        result[race_id] = build_one_group(models, data_x[race_id], mean, std)
     return result
 
 
 def get_mean_std(data_x):
-    total = np.zeros(64, dtype=np.float64)
-    total_sq = np.zeros(64, dtype=np.float64)
+    total = np.zeros(64, dtype=np.float32)
+    total_sq = np.zeros(64, dtype=np.float32)
     count = 0
     for race_id in data_x:
         total += np.sum(data_x[race_id], axis=0)
@@ -41,8 +48,8 @@ def get_mean_std(data_x):
     mean = total / count
     variance = (total_sq / count) - np.square(mean)
 
-    return torch.tensor(mean, dtype=torch.float64, device=device), torch.sqrt(
-        torch.tensor(variance, dtype=torch.float64, device=device))
+    return torch.tensor(mean, dtype=torch.float32, device=device), torch.sqrt(
+        torch.tensor(variance, dtype=torch.float32, device=device))
 
 
 def extract_group_result(data_y, k=4):
@@ -51,14 +58,14 @@ def extract_group_result(data_y, k=4):
         this_race_y = data_y[race_id]
         size = this_race_y.shape[0]
         this_y = torch.zeros((size, 2))
-        ranking = torch.tensor(this_race_y[:, 0], dtype=torch.float64, device=device)
-        number_of_participants = torch.tensor(this_race_y[:, k], dtype=torch.float64, device=device)
+        ranking = torch.tensor(this_race_y[:, 0], dtype=torch.float32, device=device)
+        number_of_participants = torch.tensor(this_race_y[:, k], dtype=torch.float32, device=device)
 
         reciprocal_rank = number_of_participants / ranking
         reciprocal_rank = torch.softmax(reciprocal_rank, dim=0)
 
-        win_value = torch.tensor(this_race_y[:, 0] == 1, dtype=torch.float64, device=device) * (torch.tensor(
-            this_race_y[:, 3], dtype=torch.float64, device=device))
+        win_value = torch.tensor(this_race_y[:, 0] == 1, dtype=torch.float32, device=device) * (torch.tensor(
+            this_race_y[:, 3], dtype=torch.float32, device=device))
 
         this_y[:, 0] = reciprocal_rank
         this_y[:, 1] = win_value

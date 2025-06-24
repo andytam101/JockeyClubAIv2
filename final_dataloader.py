@@ -116,6 +116,7 @@ class FinalDataLoader:
 
     def extract_races(self, start_date, end_date, location, distance):
         races = (self.get_query().filter(Race.date >= start_date).filter(Race.date < end_date)
+                 .filter(Race.course != "ALL WEATHER TRACK")
                  .filter(Race.location == location)
                  .filter(Race.distance == distance))
         races = races.all()
@@ -775,7 +776,6 @@ def parse_args():
 
 
 def main():
-
     args = parse_args()
     distance = args.distance
     loc_short = args.location
