@@ -31,6 +31,8 @@ def build_listwise_x(data_x, mean, std, n):
     result_x = []
     for race_id in tqdm(race_ids, desc="Building data x"):
         race = data_x[race_id]
+        if race.shape[0] < n:
+            continue
         this_x = build_listwise_race_x(race, mean, std, n)
         result_x.append(this_x)
     return torch.cat(result_x, dim=0)
@@ -51,6 +53,8 @@ def build_listwise_y(data_y, n):
     race_ids = list(data_y.keys())
     result = []
     for race_id in tqdm(race_ids, desc="Building data y"):
+        if data_y[race_id].shape[0] < n:
+            continue
         this_y = build_listwise_race_y(data_y[race_id], n)
         result.append(this_y)
 
@@ -77,15 +81,13 @@ class ListwiseModel(nn.Module):
     def __init__(self, n):
         super(ListwiseModel, self).__init__()
         self.model = nn.Sequential(
-            nn.Linear(64 * n, 16 * n),
+            nn.Linear(65 * n, 16 * n),
             nn.ReLU(),
             nn.Linear(16 * n,
-            #           16 * n),
-            # nn.ReLU(),
-            # nn.Linear(16 * n,
                       4 * n),
             nn.ReLU(),
-            nn.Linear(4 * n, n),
+            nn.Linear(4 * n,
+                      n),
         )
 
     def forward(self, x):
@@ -98,13 +100,8 @@ def shuffle_indices(m, cv_ratio=0.2):
     return indices[:cv_idx], indices[cv_idx:]
 
 
-def train_model(model, data_x, data_y, epochs, weight_decay):
+def train_model(model, data_x, data_y, test_x, test_y, epochs, weight_decay):
     m = data_x.size(0)
-    train_idx, cv_idx = shuffle_indices(m)
-    train_x = data_x[train_idx]
-    train_y = data_y[train_idx]
-    cv_x = data_x[cv_idx]
-    cv_y = data_y[cv_idx]
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=weight_decay)
@@ -112,16 +109,16 @@ def train_model(model, data_x, data_y, epochs, weight_decay):
     for epoch in range(epochs):
         model.train()
         optimizer.zero_grad()
-        output = model(train_x)
-        loss = criterion(output, train_y)
+        output = model(data_x)
+        loss = criterion(output, data_y)
         loss.backward()
         optimizer.step()
 
         if (epoch + 1) % 100 == 0:
             model.eval()
-            cv_output = model(cv_x)
-            cv_loss = criterion(cv_output, cv_y)
-            print(f"Epoch {epoch + 1}/{epochs}: train loss = {loss.item()}, cv loss = {cv_loss.item()}")
+            test_output = model(test_x)
+            test_loss = criterion(test_output, test_y)
+            print(f"Epoch {epoch + 1}/{epochs}: train loss = {loss.item()}, test loss = {test_loss.item()}")
 
 
 def aggregate_scores(m, scores, n):
@@ -157,6 +154,8 @@ def test_accuracy(model, data_x, data_y, mean, std, n):
     total = 0
     for race_id in tqdm(race_ids, desc="Testing accuracy"):
         this_y = data_y[race_id]
+        if this_y.shape[0] < n:
+            continue
         scores = prediction(model, data_x[race_id], mean, std, n)
         pred_winner = torch.argmax(scores, dim=0).item()
 
@@ -173,30 +172,55 @@ def test_accuracy(model, data_x, data_y, mean, std, n):
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("path_name")
+    parser.add_argument("n", type=int)
     return parser.parse_args()
+
+
+def build_new_race_x(race_x, race_y):
+    win_odds = race_y[:, 3]
+    new_race_x = np.insert(race_x, 0, win_odds, axis=1)
+
+    return new_race_x
+
+
+def build_new_x(data_x, data_y):
+    race_ids = list(data_x.keys())
+    result = {}
+    for race_id in race_ids:
+        result[race_id] = build_new_race_x(data_x[race_id], data_y[race_id])
+
+    return result
 
 
 def main():
     args = parse_args()
     path_name = args.path_name
-    n = 4
+    n = args.n
 
     races_x = np.load(f"final_loaded_data/{path_name}/weighed/train/data_x.npz")
     races_y = np.load(f"final_loaded_data/{path_name}/weighed/train/data_y.npz")
     print(f"Training on {len(races_x)} number of races")
 
+    races_x = build_new_x(races_x, races_y)
+
     test_x = np.load(f"final_loaded_data/{path_name}/weighed/test/data_x.npz")
     test_y = np.load(f"final_loaded_data/{path_name}/weighed/test/data_y.npz")
+
+    test_x = build_new_x(test_x, test_y)
 
     mean, std = get_mean_std(races_x)
     result_x = build_listwise_x(races_x, mean, std, n)
     result_y = build_listwise_y(races_y, n)
 
+    result_test_x = build_listwise_x(test_x, mean, std, n).to(device).float()
+    result_test_y = build_listwise_y(test_y, n).to(device).long()
+
     data_x = result_x.to(device).float()
     data_y = result_y.to(device).long()
 
     model = ListwiseModel(n).to(device).float()
-    train_model(model, data_x, data_y, epochs=1000, weight_decay=0.005)
+
+    train_model(model, data_x, data_y, result_test_x, result_test_y, epochs=int(len(races_x) * 3 / n), weight_decay=0.005)
 
     win, place, total = test_accuracy(model, races_x, races_y, mean, std, n)
     print(f"=========== TRAIN =============")
@@ -207,7 +231,7 @@ def main():
     print(f"WIN accuracy: {test_win / test_total}")
     print(f"PLACE accuracy: {test_place / test_total}")
 
-    output_path = os.path.join("final_true_listwise_models", path_name)
+    output_path = os.path.join(f"final_true_listwise_models", path_name, f"n_{n}")
     os.makedirs(output_path, exist_ok=True)
 
     accuracy = {

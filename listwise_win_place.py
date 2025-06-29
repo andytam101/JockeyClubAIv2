@@ -51,6 +51,8 @@ def build_data_x(data_x, n):
 
     counter = 0
     for race_id in race_ids:
+        if len(data_x_dict[race_id]) < n:
+            continue
         race_x, top_n_indices = build_race_x(data_x_dict[race_id], n)
         res_top_n[race_id] = top_n_indices
         result[counter] = race_x
@@ -175,6 +177,8 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("path_name")
     parser.add_argument("mode")
+    parser.add_argument("-n", "--number", type=int, default=4)
+    parser.add_argument("-t", "--threshold", type=float, default=1.1)
     return parser.parse_args()
 
 
@@ -184,29 +188,27 @@ def main():
 
     path_name = args.path_name
     mode = args.mode
+    n = args.number
+    threshold_multiplier = args.threshold
 
     pw_outputs = torch.load(f"final_grouped_outputs/{path_name}/grouped_outputs.pt")
     races_y = np.load(f"final_loaded_data/{path_name}/weighed/train/data_y.npz")
 
-    data_x, top_n_indices = build_data_x(pw_outputs, n=4)
+    data_x, top_n_indices = build_data_x(pw_outputs, n)
     data_y = build_data_y(races_y, top_n_indices, mode)
 
-    if mode == "WIN":
-        threshold = torch.mean(data_y) * 1.1  # dynamic threshold, 10% above proportion of actual positives
-    else:
-        threshold = torch.mean(data_y)
-
+    threshold = torch.mean(data_y) * threshold_multiplier  # dynamic threshold, 10% above proportion of actual positives
 
     test_outputs = torch.load(f"final_grouped_outputs/{path_name}/test_grouped_outputs.pt")
     test_y = np.load(f"final_loaded_data/{path_name}/weighed/test/data_y.npz")
-    test_x, test_top_n_indices = build_data_x(test_outputs, n=4)
+    test_x, test_top_n_indices = build_data_x(test_outputs, n)
     test_y = build_data_y(test_y, test_top_n_indices, mode)
 
-    model = ListwiseWinPlace(n=4).to(DEVICE)
+    model = ListwiseWinPlace(n).to(DEVICE)
 
     accuracy = train_model(model, data_x, data_y, threshold)
     while accuracy is None:
-        model = ListwiseWinPlace(n=4).to(DEVICE)
+        model = ListwiseWinPlace(n).to(DEVICE)
         accuracy = train_model(model, data_x, data_y, threshold)
 
     test_acc = test_accuracy(model, test_x, test_y, threshold)
