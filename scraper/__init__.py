@@ -454,7 +454,11 @@ class Scraper:
         # RACE SPECIFIC THINGS
         race_info = body.find_element(By.CLASS_NAME, "margin_top10").text.split("\n")
 
+        if race_info[0] == "Trackwork":
+            race_info = race_info[6:]
+
         date_location = race_info[1]
+
         _, month_day, year, location, time = date_location.split(", ")
         month, day = month_day.split()
         date = datetime(int(year), datetime.strptime(month, "%B").month, int(day)).date()
@@ -518,7 +522,8 @@ class Scraper:
                 rating = None
             else:
                 rating = int(rating)
-            horse_weight = int(cells[9].text)
+            horse_weight = 1000
+            # horse_weight = int(cells[9].text)
 
             this_p["number"] = number
             this_p["gear_weight"] = gear_weight

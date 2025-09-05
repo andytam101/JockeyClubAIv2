@@ -408,7 +408,7 @@ class FinalDataLoader:
             p.lane,
             p.horse_weight,
             p.gear_weight,
-            p.gear_weight / (p.horse_weight + p.horse_weight),
+            p.gear_weight / (p.horse_weight + p.gear_weight),  # TODO: retrain as it was wrong before
 
             # previous horse stats (6)
             self.get_speed_score(previous_horse_p, previous_horse_p.race.distance),

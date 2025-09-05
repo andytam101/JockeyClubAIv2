@@ -13,6 +13,7 @@ from final_dataloader import FinalDataLoader
 from datetime import datetime
 from utils.config import device
 from tqdm import tqdm
+import numpy as np
 
 from final_model_analysis import get_overall_mean_std, load_data
 from final_models import PWRankingScore, PWRelativeRanking, PWWinnerBinary, PWPlaceBinary
@@ -24,9 +25,7 @@ from listwise_win_place import build_race_x
 
 
 def build_upcoming_url():
-    return "https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?RaceDate=2025/06/22&Racecourse=ST&RaceNo=11".lower()
-    # RaceDate={date.strftime("%Y/%m/%d")}&Racecourse={location}&RaceNo={num}
-    return f"https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?".lower()
+    return "https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?RaceDate=2025/09/07&Racecourse=ST&RaceNo=1".lower()
 
 
 def get_date_location_max_num():
@@ -96,9 +95,12 @@ def filter_inexperienced(fetch_api, ps):
 
     for p in ps:
         horse_id = p["horse_id"]
+        jockey_id = p["jockey_id"]
         ps = fetch_api.fetch_participation(horse_id=horse_id)
-        filtered = [p for p in ps if p.finish_time is not None]
-        if len(filtered) == 0:
+        jockey_ps = fetch_api.fetch_participation(jockey_id=jockey_id)
+        filtered_horses = [p for p in ps if p.finish_time is not None]
+        filtered_jockeys = [p for p in jockey_ps if p.finish_time is not None]
+        if len(filtered_horses) == 0 or len(filtered_jockeys) == 0:
             continue
         result.append(p)
         result_nums.append(p["number"])
@@ -113,7 +115,6 @@ def load_model(model_init, path):
     model.load_state_dict(params)
     model.eval()
     return model
-
 
 def predict_pw(
     race_data,
@@ -131,6 +132,7 @@ def predict_pw(
     for result_p in result:
         this_p = group_into_participation(result_p)
         this_x = dataloader.load_p(this_p, result_p["trainer_id"])
+        this_x = np.nan_to_num(this_x, nan=0)
         this_x = torch.tensor(this_x, device=device, dtype=torch.float32)
         data_x[counter] = this_x
         counter += 1
@@ -144,11 +146,16 @@ def predict_pw(
 
 
 def main():
-    model_names = "location_ST_1400"
-    win_bin = load_model(PWWinnerBinary, f"final_trained_models_2/{model_names}/Winner_Binary.pth")
-    place_bin = load_model(PWPlaceBinary, f"final_trained_models_2/{model_names}/Place_Binary.pth")
-    ranking_score = load_model(PWRankingScore, f"final_trained_models_2/{model_names}/Ranking_Score.pth")
-    relative_ranking = load_model(PWRelativeRanking, f"final_trained_models_2/{model_names}/Relative_Ranking.pth")
+    model_names = "location_ST_1200"
+    win_bin = load_model(PWWinnerBinary, f"final_trained_models/{model_names}/Winner_Binary.pth")
+    place_bin = load_model(PWPlaceBinary, f"final_trained_models/{model_names}/Place_Binary.pth")
+    ranking_score = load_model(PWRankingScore, f"final_trained_models/{model_names}/Ranking_Score.pth")
+    relative_ranking = load_model(PWRelativeRanking, f"final_trained_models/{model_names}/Relative_Ranking.pth")
+
+    listwise_win = load_model(lambda: ListwiseWinPlace(n=6),
+                              f"final_trained_listwise/{model_names}/win/model_params.pt")
+    listwise_place = load_model(lambda: ListwiseWinPlace(n=6),
+                                f"final_trained_listwise/{model_names}/place/model_params.pt")
 
     models = [win_bin, place_bin, ranking_score, relative_ranking]
 
@@ -161,20 +168,18 @@ def main():
     all_data_x, _, _, _, _ = load_data(f"final_loaded_data/{model_names}/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
 
+    url = build_upcoming_url()
+    race_data = scrape_one_upcoming_race(data_collector, url)
+
     dataloader = FinalDataLoader()
     dataloader.scale_data = False
     dataloader.setup()
-
-    url = build_upcoming_url()
-    race_data = scrape_one_upcoming_race(data_collector, url)
 
     pw_outputs, result_nums = predict_pw(race_data, dataloader, data_collector, mean, std, models)
     print(result_nums)
     print(pw_outputs)
 
-    listwise_win = load_model(lambda: ListwiseWinPlace(n=4), f"final_trained_listwise_2/{model_names}/win/model_params.pt")
-    listwise_place = load_model(lambda: ListwiseWinPlace(n=4), f"final_trained_listwise_2/{model_names}/place/model_params.pt")
-    list_x, top_n_indices = build_race_x(pw_outputs, n=4)
+    list_x, top_n_indices = build_race_x(pw_outputs, n=6)
     listwise_win_output = listwise_win(list_x)
     listwise_place_output = listwise_place(list_x)
 
