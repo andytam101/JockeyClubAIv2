@@ -15,13 +15,33 @@ from utils.config import device
 from tqdm import tqdm
 import numpy as np
 
-from final_model_analysis import get_overall_mean_std, load_data
+from final_model_analysis import get_overall_mean_std
 from final_models import PWRankingScore, PWRelativeRanking, PWWinnerBinary, PWPlaceBinary
 
 from tabulate import tabulate
 
 from build_group import build_one_group
 from listwise_win_place import build_race_x
+
+
+def get_overall_mean_std(data_x):
+    total_size = 0
+    for key in data_x:
+        total_size += data_x[key].shape[0]
+
+    concatenated = np.zeros((total_size, 64), dtype=np.float64)
+
+    counter = 0
+    for key in tqdm(data_x):
+        this_size = data_x[key].shape[0]
+        concatenated[counter: counter + this_size] = data_x[key]
+        counter += this_size
+
+    mean = np.mean(concatenated, axis=0)
+    std = np.std(concatenated, axis=0)
+    std[std == 0] = 1
+
+    return mean, std
 
 
 def build_upcoming_url():
@@ -145,6 +165,15 @@ def predict_pw(
     return pw_outputs, result_nums
 
 
+def load_data(path):
+    data_x = np.load(f"{path}/data_x.npz")
+    data_y = np.load(f"{path}/data_y.npz")
+    horse_nums = np.load(f"{path}/horse_nums.npz")
+    wins = np.load(f"{path}/wins.npz")
+    places = np.load(f"{path}/places.npz")
+    return data_x, data_y, horse_nums, wins, places
+
+
 def main():
     model_names = "location_ST_1200"
     win_bin = load_model(PWWinnerBinary, f"final_trained_models/{model_names}/Winner_Binary.pth")
@@ -185,7 +214,6 @@ def main():
 
     result_nums = torch.tensor(result_nums, device=device, dtype=torch.int)
 
-    print(top_n_indices)
     print(result_nums[top_n_indices])
     print(listwise_win_output)
     print(listwise_place_output)

@@ -249,7 +249,9 @@ class FinalDataLoader:
         if self.weigh_data:
             time_weight, track_weight = normalize_weights(time_weight, track_weight)
             weight = time_weight * time_relevancy + track_weight * track_relevancy
-    
+
+            if np.sum(weight) == 0:
+                return 0
             return np.dot(weight, variable) / np.sum(weight)
         else:
             return np.mean(variable)
@@ -258,7 +260,8 @@ class FinalDataLoader:
         if self.weigh_data:
             time_weight, track_weight = normalize_weights(time_weight, track_weight)
             weight = time_weight * time_relevancy + track_weight * track_relevancy
-
+            if np.sum(weight) == 0:
+                return 0
             return np.sqrt(np.dot(weight, np.square(variable - weighted_mean)) / np.sum(weight))
         else:
             return np.std(variable)
@@ -373,7 +376,7 @@ class FinalDataLoader:
         horse_std_weighted_delta_rating = self.weigh_by_relevancy_std(horse_time_relevancy, horse_track_relevancy, horse_delta_rating, horse_mean_weighted_delta_rating)
 
         trainer_mean_weighted_rating = self.weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[:, 8], track_weight=0)
-        trainer_std_weighted_rating = self.weigh_by_relevancy_mean(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[:, 8], trainer_mean_weighted_rating, track_weight=0)
+        trainer_std_weighted_rating = self.weigh_by_relevancy_std(trainer_time_relevancy, trainer_track_relevancy, trainer_ps_info[:, 8], trainer_mean_weighted_rating, track_weight=0)
 
         # Beaten time
         horse_adjusted_beaten_time = self.scale_by_difficulty(horse_ps_info[:, 10], horse_race_number_difficulty, horse_race_rating_difficulty)

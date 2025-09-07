@@ -176,8 +176,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_new_race_x(race_x, race_y):
-    win_odds = race_y[:, 3]
+def build_new_race_x(race_x, race_y, win_odds=None):
+    # inserts win odds into race_x
+    if win_odds is None:
+        win_odds = race_y[:, 3]
     new_race_x = np.insert(race_x, 0, win_odds, axis=1)
 
     return new_race_x

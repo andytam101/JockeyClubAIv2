@@ -97,10 +97,14 @@ def filter_inexperienced(fetch_api, ps):
 
     for p in ps:
         horse_id = p["horse_id"]
+        jockey_id = p["jockey_id"]
         ps = fetch_api.fetch_participation(horse_id=horse_id)
-        filtered = [p for p in ps if p.finish_time is not None]
-        if len(filtered) == 0:
+        ps_jockey = fetch_api.fetch_participation(jockey_id=jockey_id)
+        horses_filtered = [p for p in ps if p.finish_time is not None]
+        jockey_filtered = [p for p in ps_jockey if p.finish_time is not None]
+        if len(horses_filtered) == 0 or len(jockey_filtered) == 0:
             continue
+
         result.append(p)
         result_nums.append(p["number"])
 
@@ -143,16 +147,16 @@ def get_model(name):
     match name:
         case "PWRScore":
             model = PWRankingScore()
-            model_params = torch.load("final_trained_models/Ranking_Score.pth", map_location=device, weights_only=True)
+            model_params = torch.load("final_trained_models/location_ST_1600/Ranking_Score.pth", map_location=device, weights_only=True)
         case "PWRanking":
             model = PWRelativeRanking()
-            model_params = torch.load("final_trained_models/Relative_Ranking.pth", map_location=device, weights_only=True)
+            model_params = torch.load("final_trained_models/location_ST_1600/Relative_Ranking.pth", map_location=device, weights_only=True)
         case "PWWinBin":
             model = PWWinnerBinary()
-            model_params = torch.load("final_trained_models/Winner_Binary.pth", map_location=device, weights_only=True)
+            model_params = torch.load("final_trained_models/location_ST_1600/Winner_Binary.pth", map_location=device, weights_only=True)
         case "PWPlaceBin":
             model = PWPlaceBinary()
-            model_params = torch.load("final_trained_models/Place_Binary.pth", map_location=device, weights_only=True)
+            model_params = torch.load("final_trained_models/location_ST_1600/Place_Binary.pth", map_location=device, weights_only=True)
         case "all":
             return None
         case _:
