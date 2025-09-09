@@ -45,7 +45,7 @@ def get_overall_mean_std(data_x):
 
 
 def build_upcoming_url():
-    return "https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?RaceDate=2025/09/07&Racecourse=ST&RaceNo=1".lower()
+    return "https://racing.hkjc.com/racing/information/english/racing/RaceCard.aspx?RaceDate=2025/09/10&Racecourse=HV&RaceNo=1".lower()
 
 
 def get_date_location_max_num():
@@ -136,13 +136,11 @@ def load_model(model_init, path):
     model.eval()
     return model
 
-def predict_pw(
+
+def convert_to_x_from_data(
     race_data,
     dataloader,
-    datacollector,
-    mean,
-    std,
-    models
+    datacollector
 ):
     fetch_api = datacollector.fetch
     result, result_nums = filter_inexperienced(fetch_api, race_data)
@@ -157,12 +155,21 @@ def predict_pw(
         data_x[counter] = this_x
         counter += 1
 
+    return data_x, result_nums
+
+
+def predict_pw(
+    data_x,
+    mean,
+    std,
+    models
+):
     mean = torch.tensor(mean, device=device, dtype=torch.float32)
     std = torch.tensor(std, device=device, dtype=torch.float32)
 
     pw_outputs = build_one_group(models, data_x, mean, std)
 
-    return pw_outputs, result_nums
+    return pw_outputs
 
 
 def load_data(path):
@@ -204,7 +211,8 @@ def main():
     dataloader.scale_data = False
     dataloader.setup()
 
-    pw_outputs, result_nums = predict_pw(race_data, dataloader, data_collector, mean, std, models)
+    data_x, result_nums = convert_to_x_from_data(race_data, dataloader, data_collector)
+    pw_outputs = predict_pw(data_x, mean, std, models)
     print(result_nums)
     print(pw_outputs)
 

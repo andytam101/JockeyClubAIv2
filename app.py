@@ -1,17 +1,30 @@
 from flask import Flask, request, jsonify
 import torch
+import numpy as np
 
 from collect_data import DataCollector
 from final_dataloader import FinalDataLoader
 from final_models import PWWinnerBinary, PWPlaceBinary, PWRankingScore, PWRelativeRanking
-from final_prediction import load_model, load_data, get_overall_mean_std, scrape_one_upcoming_race, predict_pw
+from final_prediction import load_model, load_data, get_overall_mean_std, scrape_one_upcoming_race, predict_pw, \
+    convert_to_x_from_data
 from listwise_win_place import ListwiseWinPlace, build_race_x
+from true_listwise import ListwiseModel, build_new_race_x, build_listwise_race_x, aggregate_scores, get_mean_std, build_new_x
 
 from database import init_engine, fetch, store
 from scraper import Scraper
 from utils.config import device
+from datetime import datetime
+
+import time
+import json
+
 
 app = Flask(__name__)
+
+
+def build_url(date, location, number):
+    date_str = datetime.strftime(date, "%Y/%m/%d")
+    return f"https://racing.hkjc.com/racing/information/english/racing/RaceCard.aspx?RaceDate={date_str}&Racecourse={location}&RaceNo={number}".lower()
 
 
 def get_models(model_names):
@@ -46,16 +59,24 @@ dataloader.setup()
 
 @app.route("/prediction")
 def prediction():
-    url = request.args.get("url", "https://racing.hkjc.com/racing/information/english/racing/RaceCard.aspx?").lower()
+    number = request.args["number"]
     loc = request.args["loc"]
     dist = request.args["dist"]
+    date = request.args["date"]
+    date = datetime.strptime(date, "%Y-%m-%d")
+    url = build_url(date, loc, number)
+
     race_data = scrape_one_upcoming_race(data_collector, url)
     pw_models, [listwise_win, listwise_place], mean, std = get_models(f"location_{loc}_{dist}")
 
-    pw_outputs, result_nums = predict_pw(race_data, dataloader, data_collector, mean, std, pw_models)
+    data_x, result_nums = convert_to_x_from_data(race_data, dataloader, data_collector)
+    pw_outputs = predict_pw(data_x, mean, std, pw_models)
     list_x, top_n_indices = build_race_x(pw_outputs, n=6)
     listwise_win_output = listwise_win(list_x)
     listwise_place_output = listwise_place(list_x)
+
+    listwise_win.eval()
+    listwise_place.eval()
 
     result_nums = torch.tensor(result_nums, device=device, dtype=torch.int)
     top_n = result_nums[top_n_indices]
@@ -66,6 +87,49 @@ def prediction():
         "top_n": top_n.tolist(),
         "result_nums": result_nums.tolist(),
         "pw_outputs": pw_outputs.tolist()
+    })
+
+
+def get_listwise_model(n, loc, dist):
+    model_param = torch.load(f"final_true_listwise_models/location_{loc}_{dist}/n_{n}/model_params.pth", map_location=device)
+    model = ListwiseModel(n)
+    model.load_state_dict(model_param)
+    return model
+
+
+@app.route("/listwise")
+def listwise():
+    number = request.args["number"]
+    loc = request.args["loc"]
+    dist = request.args["dist"]
+    date = request.args["date"]
+    n = int(request.args["n"])
+    win_odds = request.args["win_odds"]
+    win_odds = [int(x) for x in win_odds.split(",")]
+    date = datetime.strptime(date, "%Y-%m-%d")
+    url = build_url(date, loc, number)
+
+    win_odds = torch.tensor(win_odds, dtype=torch.float32, device=device)
+
+    path_name = f"location_{loc}_{dist}"
+    races_x = np.load(f"final_loaded_data/{path_name}/weighed/train/data_x.npz")
+    races_y = np.load(f"final_loaded_data/{path_name}/weighed/train/data_y.npz")
+    data_x = build_new_x(races_x, races_y)
+    mean, std = get_mean_std(data_x)
+
+    race_data = scrape_one_upcoming_race(data_collector, url)
+    model = get_listwise_model(n, loc, dist)
+    race_x, result_nums = convert_to_x_from_data(race_data, dataloader, data_collector)
+    race_x = build_new_race_x(race_x, None, win_odds)
+    listwise_x = build_listwise_race_x(race_x, mean, std, n)
+
+    model.eval()
+    listwise_prediction = model(listwise_x)
+    aggregated = aggregate_scores(len(race_x), listwise_prediction, n)
+
+    return jsonify({
+        "aggregated": aggregated.tolist(),
+        "result_nums": result_nums
     })
 
 
