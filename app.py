@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+
 import torch
 import numpy as np
 
@@ -15,11 +17,10 @@ from scraper import Scraper
 from utils.config import device
 from datetime import datetime
 
-import time
-import json
-
 
 app = Flask(__name__)
+CORS(app)
+CORS(app, origins="*")
 
 
 def build_url(date, location, number):
