@@ -106,7 +106,7 @@ def listwise():
     date = request.args["date"]
     n = int(request.args["n"])
     win_odds = request.args["win_odds"]
-    win_odds = [int(x) for x in win_odds.split(",")]
+    win_odds = [float(x) for x in win_odds.split(",")]
     date = datetime.strptime(date, "%Y-%m-%d")
     url = build_url(date, loc, number)
 
@@ -133,6 +133,56 @@ def listwise():
         "result_nums": result_nums
     })
 
+
+@app.route("/group")
+def group():
+    number = request.args["number"]
+    loc = request.args["loc"]
+    dist = request.args["dist"]
+    date = request.args["date"]
+    n = int(request.args["n"])
+    horse_nums = request.args["horse_nums"]
+    win_odds = request.args["win_odds"]
+    horse_nums = [int(x) for x in horse_nums.split(",")]
+    win_odds = [float(x) for x in win_odds.split(",")]
+    date = datetime.strptime(date, "%Y-%m-%d")
+    url = build_url(date, loc, number)
+
+    win_odds = torch.tensor(win_odds, dtype=torch.float32, device=device)
+    horse_nums = torch.tensor(horse_nums, dtype=torch.int32, device=device)
+
+    path_name = f"location_{loc}_{dist}"
+    races_x = np.load(f"final_loaded_data/{path_name}/weighed/train/data_x.npz")
+    races_y = np.load(f"final_loaded_data/{path_name}/weighed/train/data_y.npz")
+    data_x = build_new_x(races_x, races_y)
+    mean, std = get_mean_std(data_x)
+
+    race_data = scrape_one_upcoming_race(data_collector, url)
+    model = get_listwise_model(n, loc, dist)
+    race_x, result_nums = convert_to_x_from_data(race_data, dataloader, data_collector)
+
+    result_nums = torch.tensor(result_nums, dtype=torch.int32, device=device)
+
+    mask = torch.isin(result_nums, horse_nums)
+    indices = torch.nonzero(mask).flatten()
+
+    race_x = race_x[indices]
+    print(indices)
+    print(race_x)
+
+    race_x = build_new_race_x(race_x, None, win_odds)
+    listwise_x = build_listwise_race_x(race_x, mean, std, n)
+
+    model.eval()
+    listwise_prediction = model(listwise_x)
+    aggregated = aggregate_scores(len(race_x), listwise_prediction, n)
+
+    assert torch.all(result_nums[indices] == horse_nums)
+
+    return jsonify({
+        "aggregated": aggregated.tolist(),
+        "result_nums": result_nums[indices].tolist(),
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0")
