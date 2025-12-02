@@ -3,24 +3,49 @@ import torch
 from argparse import ArgumentParser
 
 from collect_data import DataCollector
+from listwise_win_place import ListwiseWinPlace
 from scraper import Scraper
 from database import fetch, store, init_engine, Participation, Race
 from scraper.generate_url import generate_upcoming_race_url
 from scraper.utils import extract_jockey_trainer_id_from_url
-from final_dataloader import FinalDataLoader
+from load_data import FinalDataLoader
 
 from datetime import datetime
 from utils.config import device
 from tqdm import tqdm
+import numpy as np
 
-from final_model_analysis import get_overall_mean_std, load_data
-from final_models import PWRankingScore, PWRelativeRanking, PWWinnerBinary, PWPlaceBinary
+from model_analysis import get_overall_mean_std
+from pw_models import PWRankingScore, PWRelativeRanking, PWWinnerBinary, PWPlaceBinary
 
 from tabulate import tabulate
 
+from build_group import build_one_group
+from listwise_win_place import build_race_x
 
-def build_upcoming_url(date, location, num):
-    return f"https://racing.hkjc.com/racing/information/English/racing/RaceCard.aspx?RaceDate={date.strftime("%Y/%m/%d")}&Racecourse={location}&RaceNo={num}".lower()
+
+def get_overall_mean_std(data_x):
+    total_size = 0
+    for key in data_x:
+        total_size += data_x[key].shape[0]
+
+    concatenated = np.zeros((total_size, 64), dtype=np.float64)
+
+    counter = 0
+    for key in tqdm(data_x):
+        this_size = data_x[key].shape[0]
+        concatenated[counter: counter + this_size] = data_x[key]
+        counter += this_size
+
+    mean = np.mean(concatenated, axis=0)
+    std = np.std(concatenated, axis=0)
+    std[std == 0] = 1
+
+    return mean, std
+
+
+def build_upcoming_url():
+    return "https://racing.hkjc.com/racing/information/english/racing/RaceCard.aspx?RaceDate=2025/09/10&Racecourse=HV&RaceNo=1".lower()
 
 
 def get_date_location_max_num():
@@ -29,13 +54,6 @@ def get_date_location_max_num():
     max_num = int(input("Max number: "))
 
     return datetime.strptime(date, "%Y/%m/%d"), location, max_num
-
-
-def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument("model", type=str)
-
-    return parser.parse_args()
 
 
 def scrape_one_upcoming_race(data_collector: DataCollector, url):
@@ -99,120 +117,115 @@ def filter_inexperienced(fetch_api, ps):
         horse_id = p["horse_id"]
         jockey_id = p["jockey_id"]
         ps = fetch_api.fetch_participation(horse_id=horse_id)
-        ps_jockey = fetch_api.fetch_participation(jockey_id=jockey_id)
-        horses_filtered = [p for p in ps if p.finish_time is not None]
-        jockey_filtered = [p for p in ps_jockey if p.finish_time is not None]
-        if len(horses_filtered) == 0 or len(jockey_filtered) == 0:
+        jockey_ps = fetch_api.fetch_participation(jockey_id=jockey_id)
+        filtered_horses = [p for p in ps if p.finish_time is not None]
+        filtered_jockeys = [p for p in jockey_ps if p.finish_time is not None]
+        if len(filtered_horses) == 0 or len(filtered_jockeys) == 0:
             continue
-
         result.append(p)
         result_nums.append(p["number"])
 
     return result, result_nums
 
 
-def predict_one_race(model, url, data_collector, dataloader, mean, std, display=True):
-    fetch_api = data_collector.fetch
-    result = scrape_one_upcoming_race(data_collector, url)
-    result, result_nums = filter_inexperienced(fetch_api, result)
-    data_x = torch.zeros((len(result), 64), dtype=torch.float64, device=device)
+def load_model(model_init, path):
+    model = model_init()
+    model.to(device)
+    params = torch.load(path, map_location=device)
+    model.load_state_dict(params)
+    model.eval()
+    return model
+
+
+def convert_to_x_from_data(
+    race_data,
+    dataloader,
+    datacollector
+):
+    fetch_api = datacollector.fetch
+    result, result_nums = filter_inexperienced(fetch_api, race_data)
+    data_x = torch.zeros((len(result), 64), dtype=torch.float32, device=device)
     counter = 0
 
-    iterator = result if not display else tqdm(result, desc="Loading data")
-
-    for result_p in iterator:
+    for result_p in result:
         this_p = group_into_participation(result_p)
         this_x = dataloader.load_p(this_p, result_p["trainer_id"])
-        this_x = torch.tensor(this_x, device=device, dtype=torch.float64)
+        this_x = np.nan_to_num(this_x, nan=0)
+        this_x = torch.tensor(this_x, device=device, dtype=torch.float32)
         data_x[counter] = this_x
         counter += 1
 
-    mean = torch.tensor(mean, dtype=torch.float64, device=device)
-    std = torch.tensor(std, dtype=torch.float64, device=device)
-
-    normalized_x = (data_x - mean) / std
-
-    model.eval()
-    pred = model(normalized_x)
-    pred = pred.flatten().tolist()
-    corresponding = list(zip(result_nums, pred))
-    corresponding.sort(key=lambda x: x[1], reverse=not model.reverse_points)
-
-    corresponding = [(f"{n}", f"{s:.4f}") for (n, s) in corresponding]
-
-    return corresponding
+    return data_x, result_nums
 
 
-def get_model(name):
-    match name:
-        case "PWRScore":
-            model = PWRankingScore()
-            model_params = torch.load("final_trained_models/location_ST_1600/Ranking_Score.pth", map_location=device, weights_only=True)
-        case "PWRanking":
-            model = PWRelativeRanking()
-            model_params = torch.load("final_trained_models/location_ST_1600/Relative_Ranking.pth", map_location=device, weights_only=True)
-        case "PWWinBin":
-            model = PWWinnerBinary()
-            model_params = torch.load("final_trained_models/location_ST_1600/Winner_Binary.pth", map_location=device, weights_only=True)
-        case "PWPlaceBin":
-            model = PWPlaceBinary()
-            model_params = torch.load("final_trained_models/location_ST_1600/Place_Binary.pth", map_location=device, weights_only=True)
-        case "all":
-            return None
-        case _:
-            raise Exception(f"Unknown model: {name}")
+def predict_pw(
+    data_x,
+    mean,
+    std,
+    models
+):
+    mean = torch.tensor(mean, device=device, dtype=torch.float32)
+    std = torch.tensor(std, device=device, dtype=torch.float32)
 
-    model.to(device).double()
-    model.load_state_dict(model_params)
+    pw_outputs = build_one_group(models, data_x, mean, std)
 
-    return model
+    return pw_outputs
+
+
+def load_data(path):
+    data_x = np.load(f"{path}/data_x.npz")
+    data_y = np.load(f"{path}/data_y.npz")
+    horse_nums = np.load(f"{path}/horse_nums.npz")
+    wins = np.load(f"{path}/wins.npz")
+    places = np.load(f"{path}/places.npz")
+    return data_x, data_y, horse_nums, wins, places
+
 
 def main():
-    args = parse_args()
-    model = get_model(args.model)
-    
-    date, location, max_num = get_date_location_max_num()
+    model_names = "location_ST_1200"
+    win_bin = load_model(PWWinnerBinary, f"final_trained_models/{model_names}/Winner_Binary.pth")
+    place_bin = load_model(PWPlaceBinary, f"final_trained_models/{model_names}/Place_Binary.pth")
+    ranking_score = load_model(PWRankingScore, f"final_trained_models/{model_names}/Ranking_Score.pth")
+    relative_ranking = load_model(PWRelativeRanking, f"final_trained_models/{model_names}/Relative_Ranking.pth")
+
+    listwise_win = load_model(lambda: ListwiseWinPlace(n=6),
+                              f"final_trained_listwise/{model_names}/win/model_params.pt")
+    listwise_place = load_model(lambda: ListwiseWinPlace(n=6),
+                                f"final_trained_listwise/{model_names}/place/model_params.pt")
+
+    models = [win_bin, place_bin, ranking_score, relative_ranking]
 
     init_engine()
     scraper = Scraper()
     fetch_api = fetch.Fetch()
     store_api = store.Store()
     data_collector = DataCollector(scraper, fetch_api, store_api)
-    all_data_x, _, _, _, _ = load_data("final_loaded_data/location_ST_1600/weighed/train")
+
+    all_data_x, _, _, _, _ = load_data(f"final_loaded_data/{model_names}/weighed/train")
     mean, std = get_overall_mean_std(all_data_x)
+
+    url = build_upcoming_url()
+    race_data = scrape_one_upcoming_race(data_collector, url)
+
     dataloader = FinalDataLoader()
-
     dataloader.scale_data = False
-
     dataloader.setup()
-    
-    for num in range(max_num):
-        url = build_upcoming_url(date, location, num + 1)
-        if model is not None:
-            corresponding = predict_one_race(model, url, data_collector, dataloader, mean, std, display=True)
-            print(f"Race {num + 1}")
-            print(tabulate(corresponding, headers = ["Horse num", "Score"], tablefmt = "psql"))
-        else:
-            final_table = []
-            print(f"Race {num + 1}")
-            for loop_model in ALL_MODELS:
-                corresponding = predict_one_race(loop_model, url, data_collector, dataloader, mean, std, display=False)                
-                for idx, row in enumerate(corresponding):
-                    if len(final_table) <= idx:
-                        final_table.append([])
-                    final_table[idx].append(row[0])
-                    final_table[idx].append(row[1])
 
-            print(tabulate(final_table, headers = ["Num", "RScore", "Num", "WBin", "Num", "PBin", "Num", "Ranking"], tablefmt="psql"))
-            
+    data_x, result_nums = convert_to_x_from_data(race_data, dataloader, data_collector)
+    pw_outputs = predict_pw(data_x, mean, std, models)
+    print(result_nums)
+    print(pw_outputs)
 
-ALL_MODELS = [
-    get_model("PWRScore"),
-    get_model("PWWinBin"),
-    get_model("PWPlaceBin"),
-    get_model("PWRanking")
-]
+    list_x, top_n_indices = build_race_x(pw_outputs, n=6)
+    listwise_win_output = listwise_win(list_x)
+    listwise_place_output = listwise_place(list_x)
+
+    result_nums = torch.tensor(result_nums, device=device, dtype=torch.int)
+
+    print(result_nums[top_n_indices])
+    print(listwise_win_output)
+    print(listwise_place_output)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

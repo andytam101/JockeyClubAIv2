@@ -1,8 +1,8 @@
 import torch
 
-from final_dataloader import normalize_weights
-from final_models import PWRankingScore, PWWinnerBinary, PWPlaceBinary, PWRelativeRanking
-from final_model_analysis import load_model, load_data, get_sorted_prediction, get_overall_mean_std
+from load_data import normalize_weights
+from pw_models import PWRankingScore, PWWinnerBinary, PWPlaceBinary, PWRelativeRanking
+from model_analysis import load_model, load_data, get_sorted_prediction, get_overall_mean_std
 
 
 def get_voted_winner(models, race_x, horse_nums, mean, std):

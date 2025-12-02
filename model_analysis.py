@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from final_models import PWRankingScore, PWRankingScore, PWPlaceBinary, PWRelativeRanking, PWWinnerBinary
+from pw_models import PWRankingScore, PWRankingScore, PWPlaceBinary, PWRelativeRanking, PWWinnerBinary
 
 
 from database import init_engine, get_session, Race

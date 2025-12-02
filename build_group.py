@@ -5,7 +5,7 @@ import numpy as np
 
 import os
 from utils.config import device
-from final_models import PWPlaceBinary, PWWinnerBinary, PWRankingScore, PWRelativeRanking
+from pw_models import PWPlaceBinary, PWWinnerBinary, PWRankingScore, PWRelativeRanking
 
 from tqdm import tqdm
 

@@ -5,9 +5,9 @@ import torch
 import numpy as np
 
 from collect_data import DataCollector
-from final_dataloader import FinalDataLoader
-from final_models import PWWinnerBinary, PWPlaceBinary, PWRankingScore, PWRelativeRanking
-from final_prediction import load_model, load_data, get_overall_mean_std, scrape_one_upcoming_race, predict_pw, \
+from load_data import FinalDataLoader
+from pw_models import PWWinnerBinary, PWPlaceBinary, PWRankingScore, PWRelativeRanking
+from prediction import load_model, load_data, get_overall_mean_std, scrape_one_upcoming_race, predict_pw, \
     convert_to_x_from_data
 from listwise_win_place import ListwiseWinPlace, build_race_x
 from true_listwise import ListwiseModel, build_new_race_x, build_listwise_race_x, aggregate_scores, get_mean_std, build_new_x

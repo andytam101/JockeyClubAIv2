@@ -12,7 +12,7 @@ from tqdm import tqdm
 import copy
 import os
 
-from final_dataloader import is_place
+from load_data import is_place
 from utils.config import device
 
 

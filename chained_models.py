@@ -1,9 +1,8 @@
 import torch
 import numpy as np
-from selenium.webdriver.common.devtools.v85.headless_experimental import begin_frame
 
-from final_models import PWPlaceBinary, PWWinnerBinary, PWRankingScore, PWRelativeRanking, PairBinary
-from final_model_analysis import load_model, get_overall_mean_std, load_data
+from pw_models import PWPlaceBinary, PWWinnerBinary, PWRankingScore, PWRelativeRanking, PairBinary
+from model_analysis import load_model, get_overall_mean_std, load_data
 
 from tqdm import tqdm
 
