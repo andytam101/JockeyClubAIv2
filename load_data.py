@@ -1,4 +1,3 @@
-# 64 PERFECT FEATURES - NO TURNING BACK. LAST FILE ON DATA LOADING.
 import argparse
 
 import numpy as np
